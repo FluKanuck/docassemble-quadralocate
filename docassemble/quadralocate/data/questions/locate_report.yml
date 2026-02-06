@@ -165,7 +165,7 @@ question: |
   Technicians on Site
 subquestion: |
   Add all technicians who worked on this job.
-list collect: True
+list collect: single_day_technicians
 fields:
   - Technician Name: single_day_technicians[i].name
   - EM Hours: single_day_technicians[i].hours['em']
@@ -226,7 +226,7 @@ subquestion: |
   Add each day of work for this job.
   
   You can save your progress and have another technician continue tomorrow.
-list collect: True
+list collect: report.job.work_days
 fields:
   - Date: report.job.work_days[i].date
     datatype: date
@@ -244,7 +244,7 @@ question: |
   Technicians for ${ report.job.work_days[i].date }
 subquestion: |
   Add all technicians who worked on this day.
-list collect: True
+list collect: report.job.work_days[i].technicians
 fields:
   - Technician Name: report.job.work_days[i].technicians[j].name
   - EM Hours: report.job.work_days[i].technicians[j].hours['em']
