@@ -1,0 +1,982 @@
+---
+metadata:
+  title: Quadra Utility Locate Report
+  short title: Locate Report
+  description: Site Locate Report for Quadra Utility Locating Ltd.
+  authors:
+    - name: Quadra Utility Locating Ltd.
+  revision_date: 2026-02-06
+---
+modules:
+  - docassemble.quadralocate.objects
+---
+objects:
+  - report: LocateReport
+  - single_day_technicians: DAList.using(object_type=Technician, minimum_number=1)
+  - report.photo_pages: DAList.using(object_type=PhotoPage, auto_gather=False)
+  - report.drawings: DAList.using(object_type=Drawing, auto_gather=False)
+---
+features:
+  navigation: True
+  progress bar: True
+  question back button: True
+---
+sections:
+  - introduction: Introduction
+  - job_info: Job Information
+  - time_billing: Time & Billing
+  - utilities: Utility Locating
+  - details: Locate Details
+  - hydrovac: Hydrovac
+  - recommendations: Recommendations
+  - media: Photos & Drawings
+  - signatures: Signatures
+  - review: Review & Export
+---
+# ============================================
+# INITIAL SCREEN - New or Resume
+# ============================================
+mandatory: True
+code: |
+  multi_user = True
+  allow_cron = True
+---
+initial: True
+code: |
+  # Set session management for multi-day/multi-user
+  set_parts(subtitle=str(report.quadra_job_number) if defined('report.quadra_job_number') else 'New Report')
+---
+question: |
+  Quadra Utility Locate Report
+subquestion: |
+  Welcome to the Quadra Utility Locate Report system.
+  
+  **Start a new report** or **resume an existing job**.
+field: report_action
+buttons:
+  - Start New Report: new
+  - Resume Existing Job: resume
+  - Edit Submitted Report: edit
+section: introduction
+---
+# Resume existing job by Job Number
+question: |
+  Resume Existing Job
+fields:
+  - Quadra Job Number: resume_job_number
+    help: Enter the job number to resume
+section: introduction
+show if:
+  variable: report_action
+  is: resume
+---
+# Edit submitted report
+question: |
+  Edit Submitted Report
+subquestion: |
+  This will create a revision of the original report.
+fields:
+  - Quadra Job Number: edit_job_number
+    help: Enter the job number to edit
+section: introduction
+show if:
+  variable: report_action
+  is: edit
+---
+# ============================================
+# JOB TYPE - Single Day or Multi-Day
+# ============================================
+question: |
+  Job Type
+subquestion: |
+  Is this a single-day job or will it span multiple days?
+field: report.job.is_multi_day
+buttons:
+  - Single Day Job: False
+  - Multi-Day Job: True
+section: job_info
+---
+# ============================================
+# JOB INFORMATION
+# ============================================
+question: |
+  Job Information
+fields:
+  - Client Company: report.client_company
+  - Quadra Job Number: report.quadra_job_number
+  - Site Address: report.site_address
+    datatype: area
+    rows: 2
+  - Site Visit Date: report.site_visit_date
+    datatype: date
+    default: ${ today() }
+section: job_info
+---
+question: |
+  BC 1 Call Information
+fields:
+  - BC 1 Call Provider: report.bc1_provider
+    datatype: radio
+    choices:
+      - None: None
+      - Provided by Quadra: Quadra
+      - Provided by Client: Client
+  - BC 1 Call Number: report.bc1_number
+    show if:
+      variable: report.bc1_provider
+      is not: None
+section: job_info
+---
+question: |
+  Client Information
+fields:
+  - Client Representative Name: report.client_rep_name
+    required: False
+  - Client PO Number: report.client_po_number
+    required: False
+  - Client Job Number: report.client_job_number
+    required: False
+section: job_info
+---
+question: |
+  Prepared By
+fields:
+  - Technician Name: report.technician_name
+section: job_info
+---
+# ============================================
+# TIME & BILLING - SINGLE DAY
+# ============================================
+if: |
+  not report.job.is_multi_day
+question: |
+  Time on Site
+fields:
+  - Start Time: single_day_start_time
+    datatype: time
+  - End Time: single_day_end_time
+    datatype: time
+  - Weather Conditions: report.weather
+    required: False
+section: time_billing
+---
+if: |
+  not report.job.is_multi_day
+question: |
+  Technicians on Site
+subquestion: |
+  Add all technicians who worked on this job.
+list collect: True
+fields:
+  - Technician Name: single_day_technicians[i].name
+  - EM Hours: single_day_technicians[i].hours['em']
+    datatype: number
+    required: False
+    default: 0
+  - GPR Hours: single_day_technicians[i].hours['gpr']
+    datatype: number
+    required: False
+    default: 0
+  - Travel Hours: single_day_technicians[i].hours['travel']
+    datatype: number
+    required: False
+    default: 0
+  - Survey Hours: single_day_technicians[i].hours['survey']
+    datatype: number
+    required: False
+    default: 0
+  - Concrete GPR Hours: single_day_technicians[i].hours['concrete_gpr']
+    datatype: number
+    required: False
+    default: 0
+  - Standby Hours: single_day_technicians[i].hours['standby']
+    datatype: number
+    required: False
+    default: 0
+section: time_billing
+---
+# Copy single day data to job structure
+if: |
+  not report.job.is_multi_day
+code: |
+  # Create single work day
+  if len(report.job.work_days) == 0:
+    report.job.work_days.appendObject()
+  day = report.job.work_days[0]
+  day.date = report.site_visit_date
+  day.start_time = single_day_start_time
+  day.end_time = single_day_end_time
+  day.weather = report.weather
+  # Copy technicians
+  day.technicians.clear()
+  for tech in single_day_technicians:
+    new_tech = day.technicians.appendObject()
+    new_tech.name = tech.name
+    for ht in Technician.HOUR_TYPES:
+      new_tech.hours[ht] = tech.hours.get(ht, 0)
+  single_day_setup_complete = True
+---
+# ============================================
+# TIME & BILLING - MULTI-DAY
+# ============================================
+if: |
+  report.job.is_multi_day
+question: |
+  Work Days
+subquestion: |
+  Add each day of work for this job.
+  
+  You can save your progress and have another technician continue tomorrow.
+list collect: True
+fields:
+  - Date: report.job.work_days[i].date
+    datatype: date
+  - Start Time: report.job.work_days[i].start_time
+    datatype: time
+  - End Time: report.job.work_days[i].end_time
+    datatype: time
+  - Weather Conditions: report.job.work_days[i].weather
+    required: False
+section: time_billing
+---
+if: |
+  report.job.is_multi_day
+question: |
+  Technicians for ${ report.job.work_days[i].date }
+subquestion: |
+  Add all technicians who worked on this day.
+list collect: True
+fields:
+  - Technician Name: report.job.work_days[i].technicians[j].name
+  - EM Hours: report.job.work_days[i].technicians[j].hours['em']
+    datatype: number
+    required: False
+    default: 0
+  - GPR Hours: report.job.work_days[i].technicians[j].hours['gpr']
+    datatype: number
+    required: False
+    default: 0
+  - Travel Hours: report.job.work_days[i].technicians[j].hours['travel']
+    datatype: number
+    required: False
+    default: 0
+  - Survey Hours: report.job.work_days[i].technicians[j].hours['survey']
+    datatype: number
+    required: False
+    default: 0
+  - Concrete GPR Hours: report.job.work_days[i].technicians[j].hours['concrete_gpr']
+    datatype: number
+    required: False
+    default: 0
+  - Standby Hours: report.job.work_days[i].technicians[j].hours['standby']
+    datatype: number
+    required: False
+    default: 0
+section: time_billing
+---
+# ============================================
+# SUPPLEMENTAL CHARGES
+# ============================================
+question: |
+  Supplemental Charges
+fields:
+  - Parking ($): report.supp_parking
+    datatype: currency
+    required: False
+  - Traffic Control: report.supp_traffic_control
+    datatype: yesnoradio
+    required: False
+  - Permitting: report.supp_permits
+    required: False
+  - Desktop Review: report.supp_desktop
+    required: False
+  - AutoCAD: report.supp_cad
+    required: False
+  - Coring: report.supp_coring
+    required: False
+  - Vapour Probes: report.supp_vapour_probes
+    required: False
+  - Camera Inspection: report.supp_camera
+    required: False
+  - Data Processing: report.supp_data_processing
+    required: False
+  - Orientation Time: report.supp_orientation
+    required: False
+  - Report Drafting: report.supp_sketch
+    required: False
+  - Kilometres Driven: report.supp_kms
+    datatype: number
+    required: False
+  - LOA: report.supp_loa
+    required: False
+section: time_billing
+---
+# ============================================
+# MATERIALS
+# ============================================
+question: |
+  Materials Used
+fields:
+  - Pin Flags: report.mat_pin_flags
+    datatype: integer
+    required: False
+  - 'Lathe 24"': report.mat_lathe_24
+    datatype: integer
+    required: False
+  - 'Lathe 48"': report.mat_lathe_48
+    datatype: integer
+    required: False
+section: time_billing
+---
+# ============================================
+# PROPERTY TYPE
+# ============================================
+question: |
+  Property Type
+field: report.property_type
+buttons:
+  - Private Property: Private
+  - Public Property: Public
+  - Both Public and Private: Both
+section: time_billing
+---
+# ============================================
+# UTILITY MATRIX
+# ============================================
+question: |
+  Electrical Utilities
+fields:
+  - note: |
+      Select all locate methods used for electrical utilities:
+  - Located with EM: report.utilities.electrical.methods['em']
+    datatype: yesno
+    default: False
+  - Located with GPR: report.utilities.electrical.methods['gpr']
+    datatype: yesno
+    default: False
+  - Located Visually: report.utilities.electrical.methods['visual']
+    datatype: yesno
+    default: False
+  - Not Located: report.utilities.electrical.methods['not_located']
+    datatype: yesno
+    default: False
+  - Not in Proposed Work Area: report.utilities.electrical.methods['not_in_area']
+    datatype: yesno
+    default: False
+section: utilities
+---
+question: |
+  Communications Utilities
+fields:
+  - note: |
+      Select all locate methods used for communications utilities:
+  - Located with EM: report.utilities.communications.methods['em']
+    datatype: yesno
+    default: False
+  - Located with GPR: report.utilities.communications.methods['gpr']
+    datatype: yesno
+    default: False
+  - Located Visually: report.utilities.communications.methods['visual']
+    datatype: yesno
+    default: False
+  - Not Located: report.utilities.communications.methods['not_located']
+    datatype: yesno
+    default: False
+  - Not in Proposed Work Area: report.utilities.communications.methods['not_in_area']
+    datatype: yesno
+    default: False
+section: utilities
+---
+question: |
+  Gas / Pipeline Utilities
+fields:
+  - note: |
+      Select all locate methods used for gas/pipeline utilities:
+  - Located with EM: report.utilities.gas.methods['em']
+    datatype: yesno
+    default: False
+  - Located with GPR: report.utilities.gas.methods['gpr']
+    datatype: yesno
+    default: False
+  - Located Visually: report.utilities.gas.methods['visual']
+    datatype: yesno
+    default: False
+  - Not Located: report.utilities.gas.methods['not_located']
+    datatype: yesno
+    default: False
+  - Not in Proposed Work Area: report.utilities.gas.methods['not_in_area']
+    datatype: yesno
+    default: False
+section: utilities
+---
+question: |
+  Water Utilities
+fields:
+  - note: |
+      Select all locate methods used for water utilities:
+  - Located with EM: report.utilities.water.methods['em']
+    datatype: yesno
+    default: False
+  - Located with GPR: report.utilities.water.methods['gpr']
+    datatype: yesno
+    default: False
+  - Located Visually: report.utilities.water.methods['visual']
+    datatype: yesno
+    default: False
+  - Not Located: report.utilities.water.methods['not_located']
+    datatype: yesno
+    default: False
+  - Not in Proposed Work Area: report.utilities.water.methods['not_in_area']
+    datatype: yesno
+    default: False
+section: utilities
+---
+question: |
+  Storm Utilities
+fields:
+  - note: |
+      Select all locate methods used for storm utilities:
+  - Located with EM: report.utilities.storm.methods['em']
+    datatype: yesno
+    default: False
+  - Located with GPR: report.utilities.storm.methods['gpr']
+    datatype: yesno
+    default: False
+  - Located Visually: report.utilities.storm.methods['visual']
+    datatype: yesno
+    default: False
+  - Not Located: report.utilities.storm.methods['not_located']
+    datatype: yesno
+    default: False
+  - Not in Proposed Work Area: report.utilities.storm.methods['not_in_area']
+    datatype: yesno
+    default: False
+section: utilities
+---
+question: |
+  Sanitary Utilities
+fields:
+  - note: |
+      Select all locate methods used for sanitary utilities:
+  - Located with EM: report.utilities.sanitary.methods['em']
+    datatype: yesno
+    default: False
+  - Located with GPR: report.utilities.sanitary.methods['gpr']
+    datatype: yesno
+    default: False
+  - Located Visually: report.utilities.sanitary.methods['visual']
+    datatype: yesno
+    default: False
+  - Not Located: report.utilities.sanitary.methods['not_located']
+    datatype: yesno
+    default: False
+  - Not in Proposed Work Area: report.utilities.sanitary.methods['not_in_area']
+    datatype: yesno
+    default: False
+section: utilities
+---
+question: |
+  Ditch
+fields:
+  - note: |
+      Select locate status for ditch:
+  - Located Visually: report.utilities.ditch.methods['visual']
+    datatype: yesno
+    default: False
+  - Not Located: report.utilities.ditch.methods['not_located']
+    datatype: yesno
+    default: False
+section: utilities
+---
+question: |
+  Unknown / Other Utilities
+fields:
+  - note: |
+      Select all locate methods used for unknown/other utilities:
+  - Located with EM: report.utilities.unknown.methods['em']
+    datatype: yesno
+    default: False
+  - Located with GPR: report.utilities.unknown.methods['gpr']
+    datatype: yesno
+    default: False
+  - Located Visually: report.utilities.unknown.methods['visual']
+    datatype: yesno
+    default: False
+  - Not Located: report.utilities.unknown.methods['not_located']
+    datatype: yesno
+    default: False
+  - Not in Proposed Work Area: report.utilities.unknown.methods['not_in_area']
+    datatype: yesno
+    default: False
+section: utilities
+---
+# ============================================
+# UTILITY DETAIL SECTIONS (Conditional)
+# ============================================
+question: |
+  Electrical Details
+subquestion: |
+  Provide details for electrical utility findings.
+fields:
+  - Electrical Summary: report.utilities.electrical.summary
+    datatype: area
+    required: False
+section: details
+show if:
+  code: |
+    report.utilities.electrical.has_any_method()
+---
+question: |
+  Communications Details
+subquestion: |
+  Provide details for communications utility findings.
+fields:
+  - Communications Summary: report.utilities.communications.summary
+    datatype: area
+    required: False
+section: details
+show if:
+  code: |
+    report.utilities.communications.has_any_method()
+---
+question: |
+  Gas / Pipeline Details
+subquestion: |
+  Provide details for gas/pipeline utility findings.
+fields:
+  - Gas / Pipeline Summary: report.utilities.gas.summary
+    datatype: area
+    required: False
+section: details
+show if:
+  code: |
+    report.utilities.gas.has_any_method()
+---
+question: |
+  Water Details
+subquestion: |
+  Provide details for water utility findings.
+fields:
+  - Water Summary: report.utilities.water.summary
+    datatype: area
+    required: False
+section: details
+show if:
+  code: |
+    report.utilities.water.has_any_method()
+---
+question: |
+  Storm and Sanitary Details
+subquestion: |
+  Provide details for storm and sanitary utility findings.
+fields:
+  - Storm and Sanitary Summary: report.storm_sanitary_summary
+    datatype: area
+    required: False
+section: details
+show if:
+  code: |
+    report.utilities.storm.has_any_method() or report.utilities.sanitary.has_any_method()
+---
+question: |
+  Unknown / Other Details
+subquestion: |
+  Provide details for unknown or other utility findings.
+fields:
+  - Unknown / Other Summary: report.utilities.unknown.summary
+    datatype: area
+    required: False
+section: details
+show if:
+  code: |
+    report.utilities.unknown.has_any_method()
+---
+# ============================================
+# SITE CONDITIONS & TRAVEL NOTES
+# ============================================
+question: |
+  Site Conditions
+subquestion: |
+  Describe any obstructions, inaccessible areas, or changes to scope.
+fields:
+  - Site Conditions: report.site_conditions
+    datatype: area
+    required: False
+section: details
+---
+question: |
+  Travel Notes
+fields:
+  - Travel Notes: report.travel_notes
+    datatype: area
+    required: False
+section: details
+---
+# ============================================
+# HYDROVAC RECOMMENDATION
+# ============================================
+question: |
+  Hydrovac Recommendation
+fields:
+  - Is Hydrovac recommended?: report.hydrovac.recommended
+    datatype: yesnoradio
+section: hydrovac
+---
+question: |
+  Hydrovac Reasons
+subquestion: |
+  Select all reasons for the Hydrovac recommendation:
+fields:
+  - Obstructions in scan area: report.hydrovac.reasons['obstructions']
+    datatype: yesno
+    default: False
+  - Unlocated utilities in area: report.hydrovac.reasons['unlocated']
+    datatype: yesno
+    default: False
+  - Possible utilities deeper than scan capabilities due to geophysical subsurface conditions: report.hydrovac.reasons['deep_utilities']
+    datatype: yesno
+    default: False
+  - No BC One Call/Site Plans/As-Builts for the area: report.hydrovac.reasons['no_documentation']
+    datatype: yesno
+    default: False
+  - Additional notes: report.hydrovac.custom_notes
+    datatype: area
+    required: False
+section: hydrovac
+show if: report.hydrovac.recommended
+---
+# ============================================
+# MISSING DOCUMENTATION
+# ============================================
+question: |
+  Missing Documentation
+subquestion: |
+  Select any documentation that was missing on site:
+fields:
+  - BC Hydro: report.missing_docs['hydro']
+    datatype: yesno
+    default: False
+  - Communications (Telus/Rogers/Shaw): report.missing_docs['comm']
+    datatype: yesno
+    default: False
+  - Fortis (Gas): report.missing_docs['gas']
+    datatype: yesno
+    default: False
+  - Municipal (Water, Storm, Sanitary): report.missing_docs['municipal']
+    datatype: yesno
+    default: False
+  - Pipeline: report.missing_docs['pipeline']
+    datatype: yesno
+    default: False
+  - As-builts: report.missing_docs['asbuilts']
+    datatype: yesno
+    default: False
+section: recommendations
+---
+# ============================================
+# RECOMMENDATIONS
+# ============================================
+question: |
+  Recommendations
+subquestion: |
+  Enter any additional recommendations.
+  
+  *Note: Missing documentation warning will be automatically appended based on your selections.*
+fields:
+  - Recommendations: report.recommendations
+    datatype: area
+    required: False
+section: recommendations
+---
+# ============================================
+# PHOTOS
+# ============================================
+question: |
+  Site Photos
+subquestion: |
+  How many photo pages will be included in this report?
+fields:
+  - Number of photo pages: report.num_photo_pages
+    datatype: integer
+    min: 0
+    max: 10
+    default: 1
+section: media
+---
+question: |
+  Photo Page ${ i + 1 }
+subquestion: |
+  Upload photos for page ${ i + 1 } of ${ report.num_photo_pages }.
+fields:
+  - Photos for this page: report.photo_pages[i].photos
+    datatype: files
+    required: False
+  - Comments for this page: report.photo_pages[i].comments
+    datatype: area
+    required: False
+section: media
+---
+code: |
+  report.photo_pages[i].page_number = i + 1
+---
+# ============================================
+# DRAWINGS
+# ============================================
+question: |
+  Locate Drawings
+subquestion: |
+  How many drawing pages will be included in this report?
+fields:
+  - Number of drawings: report.num_drawings
+    datatype: integer
+    min: 0
+    max: 10
+    default: 1
+section: media
+---
+question: |
+  Drawing ${ i + 1 } of ${ report.num_drawings }
+subquestion: |
+  Upload drawing and select the page format.
+fields:
+  - Drawing format: report.drawings[i].format
+    datatype: radio
+    choices:
+      - Normal (Letter/A4): normal
+      - Large Format (11x17 / Tabloid): large
+  - Drawing file: report.drawings[i].file
+    datatype: file
+    accept: |
+      "image/*,.pdf"
+  - Drawing title/label: report.drawings[i].title
+    required: False
+    default: "Drawing ${ i + 1 }"
+section: media
+---
+code: |
+  report.drawings[i].page_number = i + 1
+---
+# ============================================
+# CLIENT SIGNATURE
+# ============================================
+question: |
+  Client Representative Signature
+subquestion: |
+  Have the client representative sign below to acknowledge receipt of the locate report.
+fields:
+  - Client Rep Name: report.client_rep_name
+    default: ${ report.client_rep_name if defined('report.client_rep_name') else '' }
+  - Signature: report.client_signature
+    datatype: signature
+    required: False
+section: signatures
+---
+# ============================================
+# REVIEW SCREEN
+# ============================================
+question: |
+  Review Your Report
+subquestion: |
+  ### Job Information
+  
+  | Field | Value |
+  |-------|-------|
+  | Client | ${ report.client_company } |
+  | Quadra Job # | ${ report.quadra_job_number } |
+  | Site Address | ${ report.site_address } |
+  | Date | ${ report.site_visit_date } |
+  | BC 1 Call | ${ report.format_bc1_display() } |
+  | Prepared By | ${ report.technician_name } |
+  
+  ### Billing Details
+  
+  ```
+  ${ report.format_billing_details() }
+  ```
+  
+  ### Utilities Located
+  
+  % for utility in report.utilities.get_active_utilities():
+  - **${ utility.format_header() }**
+  % endfor
+  
+  % if report.hydrovac.recommended:
+  ### Hydrovac Recommendation
+  
+  ${ report.hydrovac.format_section() }
+  % endif
+  
+  ### Media Attachments
+  
+  - **Photo Pages:** ${ report.num_photo_pages }
+  - **Drawings:** ${ report.num_drawings }
+  % if report.num_drawings > 0:
+  % for drawing in report.drawings:
+  % if drawing.file:
+    - ${ drawing.title }: ${ drawing.get_format_label() }
+  % endif
+  % endfor
+  % endif
+  
+  ---
+  
+  **Ready to generate the report?**
+field: review_complete
+buttons:
+  - Generate Report: True
+  - Go Back and Edit: False
+section: review
+---
+# ============================================
+# GENERATE REPORT
+# ============================================
+mandatory: True
+code: |
+  report_action
+  report.job.is_multi_day
+  report.client_company
+  report.quadra_job_number
+  report.site_address
+  report.site_visit_date
+  report.bc1_provider
+  report.technician_name
+  report.client_rep_name
+  
+  # Time and billing
+  if not report.job.is_multi_day:
+    single_day_start_time
+    single_day_end_time
+    single_day_technicians.gathered
+    single_day_setup_complete
+  else:
+    report.job.work_days.gathered
+    for day in report.job.work_days:
+      day.technicians.gathered
+  
+  report.property_type
+  
+  # Utilities
+  report.utilities.electrical.methods['em']
+  report.utilities.communications.methods['em']
+  report.utilities.gas.methods['em']
+  report.utilities.water.methods['em']
+  report.utilities.storm.methods['em']
+  report.utilities.sanitary.methods['em']
+  report.utilities.ditch.methods['visual']
+  report.utilities.unknown.methods['em']
+  
+  # Conditional details
+  if report.utilities.electrical.has_any_method():
+    report.utilities.electrical.summary
+  if report.utilities.communications.has_any_method():
+    report.utilities.communications.summary
+  if report.utilities.gas.has_any_method():
+    report.utilities.gas.summary
+  if report.utilities.water.has_any_method():
+    report.utilities.water.summary
+  if report.utilities.storm.has_any_method() or report.utilities.sanitary.has_any_method():
+    report.storm_sanitary_summary
+  if report.utilities.unknown.has_any_method():
+    report.utilities.unknown.summary
+  
+  report.site_conditions
+  report.travel_notes
+  
+  # Hydrovac
+  report.hydrovac.recommended
+  if report.hydrovac.recommended:
+    report.hydrovac.reasons['obstructions']
+  
+  # Missing docs and recommendations
+  report.missing_docs['hydro']
+  report.recommendations
+  
+  # Photos
+  report.num_photo_pages
+  if report.num_photo_pages > 0:
+    for idx in range(report.num_photo_pages):
+      report.photo_pages[idx].photos
+    report.photo_pages.gathered = True
+  
+  # Drawings
+  report.num_drawings
+  if report.num_drawings > 0:
+    for idx in range(report.num_drawings):
+      report.drawings[idx].file
+    report.drawings.gathered = True
+  
+  # Signatures
+  report.client_signature
+  
+  # Review
+  review_complete
+  
+  final_screen
+---
+event: final_screen
+question: |
+  Report Generated Successfully
+subquestion: |
+  Your Quadra Utility Locate Report has been generated.
+  
+  **Job Number:** ${ report.quadra_job_number }
+  
+  **Client:** ${ report.client_company }
+  
+  **Site:** ${ report.site_address }
+  
+  % if report.revision_number > 0:
+  *This is revision #${ report.revision_number }*
+  % endif
+  
+  ---
+  
+  Download your report:
+  
+  ${ action_button_html(url_action('download_report'), label='Download PDF Report', icon='download', color='primary', size='lg') }
+  
+  ---
+  
+  ${ action_button_html(url_action('edit_report'), label='Edit This Report', icon='edit', color='secondary') }
+  ${ action_button_html(url_action('new_report'), label='Start New Report', icon='plus', color='secondary') }
+buttons:
+  - Exit: exit
+section: review
+---
+event: download_report
+code: |
+  report_file = pdf_concatenate(
+    'locate_report.md',
+    filename=f"Quadra_Locate_Report_{report.quadra_job_number}.pdf"
+  )
+  response(file=report_file, content_type='application/pdf')
+---
+event: edit_report
+code: |
+  report.revision_number += 1
+  review_complete = False
+  force_ask('review_complete')
+---
+event: new_report
+code: |
+  command('new_session')
+---
+# ============================================
+# SAVE PROGRESS FOR MULTI-DAY
+# ============================================
+question: |
+  Save Progress
+subquestion: |
+  Your progress has been saved.
+  
+  **Job Number:** ${ report.quadra_job_number }
+  
+  Share this job number with the next technician to continue the report.
+  
+  You can resume this report at any time by selecting "Resume Existing Job" 
+  and entering the job number.
+field: progress_saved
+buttons:
+  - Continue Working: continue
+  - Save and Exit: exit
+---
