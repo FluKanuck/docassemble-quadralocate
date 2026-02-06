@@ -53,7 +53,7 @@ subquestion: |
   
   **Start a new report** or **resume an existing job**.
   
-  <small class="text-muted">Version 1.1.0</small>
+  <small class="text-muted">Version 1.1.1</small>
 field: report_action
 buttons:
   - Start New Report: new
@@ -159,33 +159,34 @@ fields:
     required: False
 section: time_billing
 ---
+generic object: Technician
 question: |
   Technician ${ ordinal(i) }
 subquestion: |
   Enter details for technician ${ i + 1 }.
 fields:
-  - Technician Name: single_day_technicians[i].name
-  - EM Hours: single_day_technicians[i].hours['em']
+  - Technician Name: x.name
+  - EM Hours: x.hours['em']
     datatype: number
     required: False
     default: 0
-  - GPR Hours: single_day_technicians[i].hours['gpr']
+  - GPR Hours: x.hours['gpr']
     datatype: number
     required: False
     default: 0
-  - Travel Hours: single_day_technicians[i].hours['travel']
+  - Travel Hours: x.hours['travel']
     datatype: number
     required: False
     default: 0
-  - Survey Hours: single_day_technicians[i].hours['survey']
+  - Survey Hours: x.hours['survey']
     datatype: number
     required: False
     default: 0
-  - Concrete GPR Hours: single_day_technicians[i].hours['concrete_gpr']
+  - Concrete GPR Hours: x.hours['concrete_gpr']
     datatype: number
     required: False
     default: 0
-  - Standby Hours: single_day_technicians[i].hours['standby']
+  - Standby Hours: x.hours['standby']
     datatype: number
     required: False
     default: 0
