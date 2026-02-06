@@ -960,7 +960,7 @@ section: review
 event: download_report
 code: |
   report_file = pdf_concatenate(
-    'locate_report.md',
+    'docassemble.quadralocate:data/templates/locate_report.md',
     filename=f"Quadra_Locate_Report_{report.quadra_job_number}.pdf"
   )
   response(file=report_file, content_type='application/pdf')
