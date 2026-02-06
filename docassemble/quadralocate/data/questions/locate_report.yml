@@ -12,7 +12,7 @@ modules:
 ---
 objects:
   - report: LocateReport
-  - single_day_technicians: DAList.using(object_type=Technician, minimum_number=1)
+  - single_day_technicians: DAList.using(object_type=Technician, there_are_any=True)
   - report.photo_pages: DAList.using(object_type=PhotoPage, auto_gather=False)
   - report.drawings: DAList.using(object_type=Drawing, auto_gather=False)
 ---
@@ -158,10 +158,9 @@ fields:
 section: time_billing
 ---
 question: |
-  Technicians on Site
+  Technician ${ ordinal(i) }
 subquestion: |
-  Add all technicians who worked on this job.
-list collect: True
+  Enter details for technician ${ i + 1 }.
 fields:
   - Technician Name: single_day_technicians[i].name
   - EM Hours: single_day_technicians[i].hours['em']
@@ -190,6 +189,18 @@ fields:
     default: 0
 section: time_billing
 ---
+question: |
+  Any more technicians?
+subquestion: |
+  So far you have added ${ single_day_technicians.number_as_word() } technician(s).
+  
+  % for tech in single_day_technicians:
+  - ${ tech.name }
+  % endfor
+  
+  Are there any more technicians to add?
+yesno: single_day_technicians.there_is_another
+---
 # Copy single day data to job structure
 if: |
   not report.job.is_multi_day
@@ -215,12 +226,9 @@ code: |
 # TIME & BILLING - MULTI-DAY
 # ============================================
 question: |
-  Work Days
+  Work Day ${ ordinal(i) }
 subquestion: |
-  Add each day of work for this job.
-  
-  You can save your progress and have another technician continue tomorrow.
-list collect: True
+  Enter details for work day ${ i + 1 }.
 fields:
   - Date: report.job.work_days[i].date
     datatype: date
@@ -233,10 +241,17 @@ fields:
 section: time_billing
 ---
 question: |
-  Technicians for ${ report.job.work_days[i].date }
+  Any more work days?
 subquestion: |
-  Add all technicians who worked on this day.
-list collect: True
+  You have entered ${ report.job.work_days.number_as_word() } work day(s).
+  
+  Are there any more work days to add?
+yesno: report.job.work_days.there_is_another
+---
+question: |
+  Technician ${ ordinal(j) } for ${ report.job.work_days[i].date }
+subquestion: |
+  Enter details for technician ${ j + 1 } on this day.
 fields:
   - Technician Name: report.job.work_days[i].technicians[j].name
   - EM Hours: report.job.work_days[i].technicians[j].hours['em']
@@ -264,6 +279,14 @@ fields:
     required: False
     default: 0
 section: time_billing
+---
+question: |
+  Any more technicians for ${ report.job.work_days[i].date }?
+subquestion: |
+  You have entered ${ report.job.work_days[i].technicians.number_as_word() } technician(s) for this day.
+  
+  Are there any more technicians to add for this day?
+yesno: report.job.work_days[i].technicians.there_is_another
 ---
 # ============================================
 # SUPPLEMENTAL CHARGES
