@@ -122,9 +122,8 @@ fields:
       - Provided by Quadra: Quadra
       - Provided by Client: Client
   - BC 1 Call Number: report.bc1_number
-    show if:
-      code: |
-        report.bc1_provider != 'None'
+    js show if: |
+      val("report.bc1_provider") != "None"
 section: job_info
 ---
 question: |
