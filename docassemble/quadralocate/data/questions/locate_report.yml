@@ -12,7 +12,7 @@ modules:
 ---
 objects:
   - report: LocateReport
-  - single_day_technicians: DAList.using(object_type=Technician, there_are_any=True, complete_attribute='name')
+  - single_day_technicians: DAList.using(object_type=Technician, minimum_number=1)
   - report.photo_pages: DAList.using(object_type=PhotoPage, auto_gather=False)
   - report.drawings: DAList.using(object_type=Drawing, auto_gather=False)
 ---
@@ -53,7 +53,7 @@ subquestion: |
   
   **Start a new report** or **resume an existing job**.
   
-  <small class="text-muted">Version 1.1.1</small>
+  <small class="text-muted">Version 1.1.2</small>
 field: report_action
 buttons:
   - Start New Report: new
@@ -159,50 +159,40 @@ fields:
     required: False
 section: time_billing
 ---
-generic object: Technician
 question: |
-  Technician ${ ordinal(i) }
+  Technicians on Site
 subquestion: |
-  Enter details for technician ${ i + 1 }.
+  Enter details for all technicians who worked on this job.
+  
+  Click "Add another" to add more technicians.
+list collect: True
 fields:
-  - Technician Name: x.name
-  - EM Hours: x.hours['em']
+  - Technician Name: single_day_technicians[i].name
+  - EM Hours: single_day_technicians[i].hours['em']
     datatype: number
     required: False
     default: 0
-  - GPR Hours: x.hours['gpr']
+  - GPR Hours: single_day_technicians[i].hours['gpr']
     datatype: number
     required: False
     default: 0
-  - Travel Hours: x.hours['travel']
+  - Travel Hours: single_day_technicians[i].hours['travel']
     datatype: number
     required: False
     default: 0
-  - Survey Hours: x.hours['survey']
+  - Survey Hours: single_day_technicians[i].hours['survey']
     datatype: number
     required: False
     default: 0
-  - Concrete GPR Hours: x.hours['concrete_gpr']
+  - Concrete GPR Hours: single_day_technicians[i].hours['concrete_gpr']
     datatype: number
     required: False
     default: 0
-  - Standby Hours: x.hours['standby']
+  - Standby Hours: single_day_technicians[i].hours['standby']
     datatype: number
     required: False
     default: 0
 section: time_billing
----
-question: |
-  Any more technicians?
-subquestion: |
-  So far you have added ${ single_day_technicians.number_as_word() } technician(s).
-  
-  % for tech in single_day_technicians:
-  - ${ tech.name }
-  % endfor
-  
-  Are there any more technicians to add?
-yesno: single_day_technicians.there_is_another
 ---
 # Copy single day data to job structure
 if: |

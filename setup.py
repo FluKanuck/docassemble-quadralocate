@@ -6,7 +6,7 @@ def read(fname):
 
 setup(
     name='docassemble.quadralocate',
-    version='1.1.1',
+    version='1.1.2',
     description='Quadra Utility Locating Site Report Interview',
     long_description=read('README.md') if os.path.exists('README.md') else '',
     long_description_content_type='text/markdown',
