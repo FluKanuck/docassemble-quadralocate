@@ -146,8 +146,6 @@ section: job_info
 # ============================================
 # TIME & BILLING - SINGLE DAY
 # ============================================
-if: |
-  not report.job.is_multi_day
 question: |
   Time on Site
 fields:
@@ -159,8 +157,6 @@ fields:
     required: False
 section: time_billing
 ---
-if: |
-  not report.job.is_multi_day
 question: |
   Technicians on Site
 subquestion: |
@@ -218,8 +214,6 @@ code: |
 # ============================================
 # TIME & BILLING - MULTI-DAY
 # ============================================
-if: |
-  report.job.is_multi_day
 question: |
   Work Days
 subquestion: |
@@ -238,8 +232,6 @@ fields:
     required: False
 section: time_billing
 ---
-if: |
-  report.job.is_multi_day
 question: |
   Technicians for ${ report.job.work_days[i].date }
 subquestion: |
