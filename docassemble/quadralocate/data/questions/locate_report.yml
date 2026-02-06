@@ -123,8 +123,8 @@ fields:
       - Provided by Client: Client
   - BC 1 Call Number: report.bc1_number
     show if:
-      variable: report.bc1_provider
-      is not: None
+      code: |
+        report.bc1_provider != 'None'
 section: job_info
 ---
 question: |
