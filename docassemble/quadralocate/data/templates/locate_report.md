@@ -21,7 +21,11 @@
 
 **BC 1 Call Number:** {{ report.format_bc1_display() }}
 
+{% if not report.job.is_multi_day and defined('report.weather') %}
 **Weather Conditions:** {{ report.weather }}
+{% elif report.job.is_multi_day and report.job.work_days %}
+**Weather Conditions:** {% for day in report.job.work_days %}{% if day.weather %}{{ format_date(day.date, format='short') }}: {{ day.weather }}{% if not loop.last %}; {% endif %}{% endif %}{% endfor %}
+{% endif %}
 
 ---
 
@@ -37,11 +41,17 @@
 
 ---
 
+{% if defined('report.client_po_number') and report.client_po_number %}
 **Client PO Number:** {{ report.client_po_number }}
+{% endif %}
 
+{% if defined('report.client_job_number') and report.client_job_number %}
 **Client Job Number:** {{ report.client_job_number }}
+{% endif %}
 
+{% if defined('report.client_rep_name') and report.client_rep_name %}
 **Client Representative:** {{ report.client_rep_name }}
+{% endif %}
 
 {% if report.client_signature %}
 **Client Signature:**

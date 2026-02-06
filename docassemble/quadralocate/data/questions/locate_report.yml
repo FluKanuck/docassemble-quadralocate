@@ -763,7 +763,7 @@ question: |
 subquestion: |
   Have the client representative sign below to acknowledge receipt of the locate report.
 fields:
-  - Client Rep Name: report.client_rep_name
+  - Client Rep Name: report.client_signature_name
     default: ${ report.client_rep_name if defined('report.client_rep_name') else '' }
   - Signature: report.client_signature
     datatype: signature
