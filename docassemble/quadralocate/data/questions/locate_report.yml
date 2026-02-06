@@ -12,7 +12,7 @@ modules:
 ---
 objects:
   - report: LocateReport
-  - single_day_technicians: DAList.using(object_type=Technician, there_are_any=True)
+  - single_day_technicians: DAList.using(object_type=Technician, there_are_any=True, complete_attribute='name')
   - report.photo_pages: DAList.using(object_type=PhotoPage, auto_gather=False)
   - report.drawings: DAList.using(object_type=Drawing, auto_gather=False)
 ---

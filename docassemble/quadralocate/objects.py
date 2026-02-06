@@ -164,7 +164,7 @@ class WorkDay(DAObject):
     
     def init(self, *pargs, **kwargs):
         super().init(*pargs, **kwargs)
-        self.initializeAttribute('technicians', DAList.using(object_type=Technician, there_are_any=True))
+        self.initializeAttribute('technicians', DAList.using(object_type=Technician, there_are_any=True, complete_attribute='name'))
     
     def format_time_range(self):
         """Format start to end time as '9:30 am to 4:15 pm'."""
@@ -193,7 +193,7 @@ class MultiDayJob(DAObject):
     
     def init(self, *pargs, **kwargs):
         super().init(*pargs, **kwargs)
-        self.initializeAttribute('work_days', DAList.using(object_type=WorkDay, there_are_any=True))
+        self.initializeAttribute('work_days', DAList.using(object_type=WorkDay, there_are_any=True, complete_attribute='date'))
         self.is_multi_day = False
     
     def get_all_technicians(self):
