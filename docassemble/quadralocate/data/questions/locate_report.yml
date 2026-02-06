@@ -52,6 +52,8 @@ subquestion: |
   Welcome to the Quadra Utility Locate Report system.
   
   **Start a new report** or **resume an existing job**.
+  
+  <small class="text-muted">Version 1.1.0</small>
 field: report_action
 buttons:
   - Start New Report: new
