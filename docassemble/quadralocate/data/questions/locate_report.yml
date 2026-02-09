@@ -53,7 +53,7 @@ subquestion: |
   
   **Start a new report** or **resume an existing job**.
   
-  <small class="text-muted">Version 1.1.4</small>
+  <small class="text-muted">Version 1.1.5</small>
 field: report_action
 buttons:
   - Start New Report: new
@@ -207,25 +207,25 @@ section: time_billing
 code: |
   single_day_technicians[i].hours.there_are_any = True
 ---
-# Copy single day data to job structure
+# Copy single day data to job structure (without triggering work_days gather = no duplicate Time on Site)
 if: |
   not report.job.is_multi_day
 code: |
-  # Create single work day
-  if len(report.job.work_days) == 0:
+  # Create one work day from Time on Site + technicians; mark work_days gathered so we never ask for "Work Day 1" again
+  if not report.job.work_days.has_been_gathered():
     report.job.work_days.appendObject()
-  day = report.job.work_days[0]
-  day.date = report.site_visit_date
-  day.start_time = single_day_start_time
-  day.end_time = single_day_end_time
-  day.weather = report.weather
-  # Copy technicians
-  day.technicians.clear()
-  for tech in single_day_technicians:
-    new_tech = day.technicians.appendObject()
-    new_tech.name = tech.name
-    for ht in Technician.HOUR_TYPES:
-      new_tech.hours[ht] = tech.hours.get(ht, 0)
+    day = report.job.work_days[0]
+    day.date = report.site_visit_date
+    day.start_time = single_day_start_time
+    day.end_time = single_day_end_time
+    day.weather = report.weather
+    day.technicians.clear()
+    for tech in single_day_technicians:
+      new_tech = day.technicians.appendObject()
+      new_tech.name = tech.name
+      for ht in Technician.HOUR_TYPES:
+        new_tech.hours[ht] = tech.hours.get(ht, 0)
+    report.job.work_days.gathered = True
   single_day_setup_complete = True
 ---
 # ============================================
