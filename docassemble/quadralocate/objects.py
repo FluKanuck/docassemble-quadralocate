@@ -99,13 +99,10 @@ class UtilityMatrix(DAObject):
     
     def init(self, *pargs, **kwargs):
         super().init(*pargs, **kwargs)
-        # Use utilities declared in YAML (report.utilities.electrical etc.) so they have
-        # correct intrinsic names; only set key/display_name/available_methods here.
-        for key, display_name, methods in self.UTILITY_TYPES:
-            utility = getattr(self, key)
-            utility.key = key
-            utility.display_name = display_name
-            utility.available_methods = methods
+        # Do NOT access children (e.g. getattr(self, key)) here: that would require
+        # report.utilities.electrical etc. while report.utilities is still being created,
+        # causing an infinite loop. Children are initialized in a separate code block
+        # (utilities_matrix_initialized) after report.utilities exists.
     
     def get_active_utilities(self):
         """Return list of utilities that should appear in report."""

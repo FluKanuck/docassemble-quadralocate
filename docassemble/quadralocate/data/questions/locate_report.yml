@@ -355,6 +355,18 @@ section: time_billing
 # ============================================
 # UTILITY MATRIX
 # ============================================
+# Initialize each utility (key, display_name, available_methods) after report.utilities
+# exists; do not do this in UtilityMatrix.init() or we get report <-> x.electrical loop.
+code: |
+  for key, display_name, methods in report.utilities.UTILITY_TYPES:
+    u = getattr(report.utilities, key)
+    u.key = key
+    u.display_name = display_name
+    u.available_methods = methods
+  utilities_matrix_initialized = True
+needs:
+  - report.utilities
+---
 question: |
   Electrical Utilities
 fields:
@@ -878,7 +890,8 @@ code: |
   
   report.property_type
   
-  # Utilities
+  # Utilities (initialize matrix children after report.utilities exists to avoid loop)
+  utilities_matrix_initialized
   report.utilities.electrical.methods['em']
   report.utilities.communications.methods['em']
   report.utilities.gas.methods['em']
