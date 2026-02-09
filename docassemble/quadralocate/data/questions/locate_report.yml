@@ -15,6 +15,15 @@ objects:
   - report.time_entries: DAList.using(object_type=TimeEntry, minimum_number=1)
   - report.photo_pages: DAList.using(object_type=PhotoPage, auto_gather=False)
   - report.drawings: DAList.using(object_type=Drawing, auto_gather=False)
+  # Utilities declared here so each has intrinsic name report.utilities.<key> (avoids rgekpcZRCyeu.methods['em'] lookup errors)
+  - report.utilities.electrical: UtilityType
+  - report.utilities.communications: UtilityType
+  - report.utilities.gas: UtilityType
+  - report.utilities.water: UtilityType
+  - report.utilities.storm: UtilityType
+  - report.utilities.sanitary: UtilityType
+  - report.utilities.ditch: UtilityType
+  - report.utilities.unknown: UtilityType
 ---
 features:
   navigation: True
@@ -53,7 +62,7 @@ subquestion: |
   
   **Start a new report** or **resume an existing job**.
   
-  <small class="text-muted">Version 1.1.11</small>
+  <small class="text-muted">Version 1.1.12</small>
 field: report_action
 buttons:
   - Start New Report: new

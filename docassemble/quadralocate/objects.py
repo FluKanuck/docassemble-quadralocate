@@ -99,13 +99,13 @@ class UtilityMatrix(DAObject):
     
     def init(self, *pargs, **kwargs):
         super().init(*pargs, **kwargs)
-        # Initialize each utility type
+        # Use utilities declared in YAML (report.utilities.electrical etc.) so they have
+        # correct intrinsic names; only set key/display_name/available_methods here.
         for key, display_name, methods in self.UTILITY_TYPES:
-            utility = UtilityType()
+            utility = getattr(self, key)
             utility.key = key
             utility.display_name = display_name
             utility.available_methods = methods
-            setattr(self, key, utility)
     
     def get_active_utilities(self):
         """Return list of utilities that should appear in report."""
