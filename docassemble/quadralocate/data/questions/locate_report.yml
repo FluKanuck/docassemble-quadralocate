@@ -53,7 +53,7 @@ subquestion: |
   
   **Start a new report** or **resume an existing job**.
   
-  <small class="text-muted">Version 1.1.10</small>
+  <small class="text-muted">Version 1.1.11</small>
 field: report_action
 buttons:
   - Start New Report: new
@@ -231,7 +231,7 @@ code: |
 code: |
   if not report.job.work_days.has_been_gathered():
     from docassemble.quadralocate.objects import HOUR_TYPES, HoursDict
-    # Unique dates in order of first appearance
+    report.job.work_days.gathered = True
     dates_seen = []
     for entry in report.time_entries:
       d = entry.date
@@ -249,26 +249,32 @@ code: |
         if ends:
           day.end_time = max(ends)
       day.weather = report.weather
+      day.technicians.gathered = True
       tech_names = []
       for e in day_entries:
         if e.technician_name and e.technician_name not in tech_names:
           tech_names.append(e.technician_name)
       for name in tech_names:
         tech_entries = [e for e in day_entries if e.technician_name == name]
+        hours_vals = {}
+        for ht in HOUR_TYPES:
+          if ht == 'two_hr_min':
+            hours_vals[ht] = any(e.hours.get(ht) for e in tech_entries)
+          else:
+            hours_vals[ht] = sum(float(e.hours.get(ht, 0) or 0) for e in tech_entries)
         tech = day.technicians.appendObject()
         tech.name = name
         if tech_entries:
           tech.start_time = tech_entries[0].start_time
           tech.end_time = tech_entries[-1].end_time
-        for ht in HOUR_TYPES:
-          if ht == 'two_hr_min':
-            tech.hours[ht] = any(e.hours.get(ht) for e in tech_entries)
-          else:
-            tech.hours[ht] = sum(float(e.hours.get(ht, 0) or 0) for e in tech_entries)
-        tech.hours = HoursDict(dict(tech.hours))
-    report.job.work_days.gathered = True
+        tech.hours = HoursDict(hours_vals)
     report.job.is_multi_day = (len(report.job.work_days) > 1)
   time_entries_built = True
+---
+# Satisfy lookup for work_days[i].technicians[j].hours.there_are_any (docassemble seeks a defining block)
+code: |
+  time_entries_built
+  report.job.work_days[i].technicians[j].hours.there_are_any = True
 ---
 # ============================================
 # SUPPLEMENTAL CHARGES (1 question)
