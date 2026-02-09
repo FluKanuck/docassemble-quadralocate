@@ -8,6 +8,7 @@ __all__ = [
     'UtilityType',
     'UtilityMatrix',
     'Technician',
+    'TimeEntry',
     'WorkDay',
     'MultiDayJob',
     'HydrovacRecommendation',
@@ -104,50 +105,74 @@ class UtilityMatrix(DAObject):
         return active
 
 
+# Hour types and labels shared by Technician and TimeEntry (10 types; two_hr_min is Yes/No)
+HOUR_TYPES = ['em', 'gpr', 'travel', 'gps_survey', 'rts_survey', 'two_hr_min', 'orientations', 'sketch_drafting', 'ferry_standby', 'camera_inspection']
+HOUR_LABELS = {
+    'em': 'EM',
+    'gpr': 'GPR',
+    'travel': 'Travel',
+    'gps_survey': 'GPS Survey',
+    'rts_survey': 'RTS Survey',
+    'two_hr_min': '2Hr Min',
+    'orientations': 'Orientations',
+    'sketch_drafting': 'Sketch Drafting',
+    'ferry_standby': 'Ferry Standby',
+    'camera_inspection': 'Camera Inspection',
+}
+HOUR_TYPES_NUMERIC = [k for k in HOUR_TYPES if k != 'two_hr_min']
+
+
+class TimeEntry(DAObject):
+    """One row in Table 1: date, technician name, start/end time; hours filled in Table 2."""
+    
+    def init(self, *pargs, **kwargs):
+        super().init(*pargs, **kwargs)
+        self.initializeAttribute('hours', DADict)
+        for hour_type in HOUR_TYPES:
+            if hour_type not in self.hours:
+                self.hours[hour_type] = 0 if hour_type != 'two_hr_min' else False
+
+
 class Technician(DAObject):
     """Represents a technician with their hours breakdown."""
     
-    HOUR_TYPES = ['em', 'gpr', 'travel', 'survey', 'concrete_gpr', 'standby']
-    HOUR_LABELS = {
-        'em': 'EM',
-        'gpr': 'GPR',
-        'travel': 'Travel',
-        'survey': 'Survey',
-        'concrete_gpr': 'Conc. GPR',
-        'standby': 'Standby'
-    }
+    HOUR_TYPES = HOUR_TYPES
+    HOUR_LABELS = HOUR_LABELS
     
     def init(self, *pargs, **kwargs):
         super().init(*pargs, **kwargs)
         self.initializeAttribute('hours', DADict)
         for hour_type in self.HOUR_TYPES:
             if hour_type not in self.hours:
-                self.hours[hour_type] = 0
+                self.hours[hour_type] = 0 if hour_type != 'two_hr_min' else False
     
     def has_any_hours(self):
-        """Check if technician has any hours recorded."""
-        for hour_type in self.HOUR_TYPES:
-            if self.hours.get(hour_type, 0) > 0:
+        """Check if technician has any hours or 2Hr Min recorded."""
+        for hour_type in HOUR_TYPES_NUMERIC:
+            if (self.hours.get(hour_type, 0) or 0) > 0:
                 return True
+        if self.hours.get('two_hr_min'):
+            return True
         return False
     
     def get_total_hours(self):
-        """Calculate total hours for this technician."""
+        """Calculate total hours for this technician (numeric types only)."""
         total = 0
-        for hour_type in self.HOUR_TYPES:
+        for hour_type in HOUR_TYPES_NUMERIC:
             total += float(self.hours.get(hour_type, 0) or 0)
         return total
     
     def format_hours_line(self):
-        """Format hours as 'EM = 2; GPR = 1.5; Travel = 0.5'."""
+        """Format hours as 'EM = 2; GPR = 1.5; 2Hr Min = Yes; ...'."""
         parts = []
         for hour_type in self.HOUR_TYPES:
-            value = self.hours.get(hour_type, 0)
-            if value and float(value) > 0:
+            value = self.hours.get(hour_type)
+            if hour_type == 'two_hr_min':
+                if value:
+                    parts.append(f"{self.HOUR_LABELS.get(hour_type, hour_type)} = Yes")
+            elif value and float(value) > 0:
                 label = self.HOUR_LABELS.get(hour_type, hour_type)
-                # Format number: remove trailing zeros
-                formatted = format_number(float(value))
-                parts.append(f"{label} = {formatted}")
+                parts.append(f"{label} = {format_number(float(value))}")
         return "; ".join(parts)
     
     def format_tech_line(self):
@@ -180,11 +205,14 @@ class WorkDay(DAObject):
         return ""
     
     def get_all_hours_by_type(self):
-        """Sum all technician hours by type for this day."""
+        """Sum all technician hours by type for this day (two_hr_min: True if any)."""
         totals = {ht: 0 for ht in Technician.HOUR_TYPES}
+        totals['two_hr_min'] = False
         for tech in self.technicians:
-            for hour_type in Technician.HOUR_TYPES:
+            for hour_type in HOUR_TYPES_NUMERIC:
                 totals[hour_type] += float(tech.hours.get(hour_type, 0) or 0)
+            if tech.hours.get('two_hr_min'):
+                totals['two_hr_min'] = True
         return totals
 
 
@@ -204,17 +232,23 @@ class MultiDayJob(DAObject):
                 name = getattr(tech, 'name', 'Unknown')
                 if name not in tech_dict:
                     tech_dict[name] = {'hours': {ht: 0 for ht in Technician.HOUR_TYPES}}
-                for hour_type in Technician.HOUR_TYPES:
+                    tech_dict[name]['hours']['two_hr_min'] = False
+                for hour_type in HOUR_TYPES_NUMERIC:
                     tech_dict[name]['hours'][hour_type] += float(tech.hours.get(hour_type, 0) or 0)
+                if tech.hours.get('two_hr_min'):
+                    tech_dict[name]['hours']['two_hr_min'] = True
         return tech_dict
     
     def get_combined_totals(self):
         """Get combined hour totals across all days and technicians."""
         totals = {ht: 0 for ht in Technician.HOUR_TYPES}
+        totals['two_hr_min'] = False
         for day in self.work_days:
             day_totals = day.get_all_hours_by_type()
-            for hour_type in Technician.HOUR_TYPES:
+            for hour_type in HOUR_TYPES_NUMERIC:
                 totals[hour_type] += day_totals[hour_type]
+            if day_totals.get('two_hr_min'):
+                totals['two_hr_min'] = True
         return totals
     
     def format_time_on_site(self):
@@ -473,45 +507,38 @@ class LocateReport(DAObject):
         return "\r".join(lines)
     
     def format_supplemental(self):
-        """Format supplemental charges."""
+        """Format supplemental charges (9 items: Parking $ + 8 yes/no)."""
         items = []
         supp_fields = [
             ('parking', 'Parking'),
             ('traffic_control', 'Traffic control'),
-            ('permits', 'Permitting'),
+            ('permitting', 'Permitting'),
+            ('loa', 'LOA'),
             ('desktop', 'Desktop review'),
             ('cad', 'AutoCAD'),
-            ('coring', 'Coring'),
+            ('coring', 'Concrete coring'),
             ('vapour_probes', 'Vapour probes'),
-            ('camera', 'Camera inspection'),
             ('data_processing', 'Data processing'),
-            ('orientation', 'Orientation Time'),
-            ('sketch', 'Report Drafting'),
-            ('kms', 'Kilometres'),
-            ('loa', 'LOA'),
         ]
-        
         for key, label in supp_fields:
             value = getattr(self, f'supp_{key}', None)
             if value:
                 items.append(f"{label} = {value}")
-        
         return "; ".join(items)
     
     def format_materials(self):
-        """Format materials with 'x' prefix."""
+        """Format materials (4 items: Pin Flags, Lathe 24", Lathe 48", KMs Driven)."""
         items = []
         mat_fields = [
             ('pin_flags', 'Pin flags'),
             ('lathe_24', 'Lathe 24"'),
             ('lathe_48', 'Lathe 48"'),
+            ('kms', 'KMs driven'),
         ]
-        
         for key, label in mat_fields:
             value = getattr(self, f'mat_{key}', None)
-            if value:
+            if value is not None and value != '':
                 items.append(f"{label} x{value}")
-        
         return "; ".join(items)
     
     def format_property_type(self):
@@ -632,17 +659,16 @@ def oxford_join(items):
 
 
 def format_totals_line(totals):
-    """Format totals dict as 'EM = 3; GPR = 3.5; Travel = 0.5'."""
+    """Format totals dict as 'EM = 3; GPR = 3.5; 2Hr Min = Yes; ...'."""
     parts = []
-    order = ['em', 'gpr', 'travel', 'survey', 'concrete_gpr', 'standby']
     labels = Technician.HOUR_LABELS
-    
-    for key in order:
+    for key in Technician.HOUR_TYPES:
         value = totals.get(key, 0)
-        if value > 0:
-            label = labels.get(key, key)
-            parts.append(f"{label} = {format_number(value)}")
-    
+        if key == 'two_hr_min':
+            if value:
+                parts.append(f"{labels.get(key, key)} = Yes")
+        elif value and float(value) > 0:
+            parts.append(f"{labels.get(key, key)} = {format_number(float(value))}")
     return "; ".join(parts)
 
 

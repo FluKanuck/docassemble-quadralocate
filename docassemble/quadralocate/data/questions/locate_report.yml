@@ -12,7 +12,7 @@ modules:
 ---
 objects:
   - report: LocateReport
-  - single_day_technicians: DAList.using(object_type=Technician, minimum_number=1)
+  - report.time_entries: DAList.using(object_type=TimeEntry, minimum_number=1)
   - report.photo_pages: DAList.using(object_type=PhotoPage, auto_gather=False)
   - report.drawings: DAList.using(object_type=Drawing, auto_gather=False)
 ---
@@ -53,7 +53,7 @@ subquestion: |
   
   **Start a new report** or **resume an existing job**.
   
-  <small class="text-muted">Version 1.1.5</small>
+  <small class="text-muted">Version 1.1.6</small>
 field: report_action
 buttons:
   - Start New Report: new
@@ -84,19 +84,6 @@ section: introduction
 show if:
   variable: report_action
   is: edit
----
-# ============================================
-# JOB TYPE - Single Day or Multi-Day
-# ============================================
-question: |
-  Job Type
-subquestion: |
-  Is this a single-day job or will it span multiple days?
-field: report.job.is_multi_day
-buttons:
-  - Single Day Job: False
-  - Multi-Day Job: True
-section: job_info
 ---
 # ============================================
 # JOB INFORMATION
@@ -146,160 +133,141 @@ fields:
 section: job_info
 ---
 # ============================================
-# TIME & BILLING - SINGLE DAY
+# TIME & BILLING - Table 1: Who was on site when
 # ============================================
 question: |
-  Time on Site
+  Time on Site — Who was on site when
+subquestion: |
+  Add one row per shift (date + technician + start/end time). Same technician can appear on multiple rows for different days or time blocks.
+  
+  Click "Add another" to add more entries.
+list collect: True
 fields:
-  - Start Time: single_day_start_time
+  - Date: report.time_entries[i].date
+    datatype: date
+    default: ${ report.site_visit_date if defined('report.site_visit_date') else None }
+  - Technician Name: report.time_entries[i].technician_name
+  - Start Time: report.time_entries[i].start_time
     datatype: time
-  - End Time: single_day_end_time
+  - End Time: report.time_entries[i].end_time
     datatype: time
+section: time_billing
+---
+question: |
+  Weather Conditions
+subquestion: |
+  Optional. Enter weather for the job (applies to all days).
+fields:
   - Weather Conditions: report.weather
     required: False
 section: time_billing
 ---
 question: |
-  Technicians on Site
+  Any more time entries to add?
 subquestion: |
-  Enter details for all technicians who worked on this job.
+  You have entered ${ report.time_entries.number_as_word() } entry(ies).
   
-  Click "Add another" to add more technicians.
-list collect: True
-fields:
-  - Technician Name: single_day_technicians[i].name
-  - EM Hours: single_day_technicians[i].hours['em']
-    datatype: number
-    required: False
-    default: 0
-  - GPR Hours: single_day_technicians[i].hours['gpr']
-    datatype: number
-    required: False
-    default: 0
-  - Travel Hours: single_day_technicians[i].hours['travel']
-    datatype: number
-    required: False
-    default: 0
-  - Survey Hours: single_day_technicians[i].hours['survey']
-    datatype: number
-    required: False
-    default: 0
-  - Concrete GPR Hours: single_day_technicians[i].hours['concrete_gpr']
-    datatype: number
-    required: False
-    default: 0
-  - Standby Hours: single_day_technicians[i].hours['standby']
-    datatype: number
-    required: False
-    default: 0
+  Add another row (e.g. another day or another technician)?
+yesno: report.time_entries.there_is_another
 section: time_billing
 ---
+# ============================================
+# TIME & BILLING - Table 2: Hour breakdown per entry
+# ============================================
 question: |
-  Any more technicians to add?
+  Hour breakdown — ${ format_date(report.time_entries[i].date, format='short') } — ${ report.time_entries[i].technician_name }
 subquestion: |
-  You have entered ${ single_day_technicians.number_as_word() } technician(s).
-  
-  Are there any more technicians to add for this job?
-yesno: single_day_technicians.there_is_another
+  Enter hours for this entry (Entry ${ i + 1 } of ${ len(report.time_entries) }).
+fields:
+  - EM: report.time_entries[i].hours['em']
+    datatype: number
+    required: False
+    default: 0
+  - GPR: report.time_entries[i].hours['gpr']
+    datatype: number
+    required: False
+    default: 0
+  - Travel: report.time_entries[i].hours['travel']
+    datatype: number
+    required: False
+    default: 0
+  - GPS Survey: report.time_entries[i].hours['gps_survey']
+    datatype: number
+    required: False
+    default: 0
+  - RTS Survey: report.time_entries[i].hours['rts_survey']
+    datatype: number
+    required: False
+    default: 0
+  - 2Hr Min: report.time_entries[i].hours['two_hr_min']
+    datatype: yesnoradio
+    required: False
+  - Orientations: report.time_entries[i].hours['orientations']
+    datatype: number
+    required: False
+    default: 0
+  - Sketch Drafting: report.time_entries[i].hours['sketch_drafting']
+    datatype: number
+    required: False
+    default: 0
+  - Ferry Standby: report.time_entries[i].hours['ferry_standby']
+    datatype: number
+    required: False
+    default: 0
+  - Camera Inspection: report.time_entries[i].hours['camera_inspection']
+    datatype: number
+    required: False
+    default: 0
 section: time_billing
 ---
-# Define DADict gathering: hours always has entries (fixed keys from question)
+# Define DADict gathering for Table 2
 code: |
-  single_day_technicians[i].hours.there_are_any = True
+  report.time_entries[i].hours.there_are_any = True
 ---
-# Copy single day data to job structure (without triggering work_days gather = no duplicate Time on Site)
-if: |
-  not report.job.is_multi_day
+# Build work_days and technicians from time_entries (for report/PDF)
 code: |
-  # Create one work day from Time on Site + technicians; mark work_days gathered so we never ask for "Work Day 1" again
   if not report.job.work_days.has_been_gathered():
-    report.job.work_days.appendObject()
-    day = report.job.work_days[0]
-    day.date = report.site_visit_date
-    day.start_time = single_day_start_time
-    day.end_time = single_day_end_time
-    day.weather = report.weather
-    day.technicians.clear()
-    for tech in single_day_technicians:
-      new_tech = day.technicians.appendObject()
-      new_tech.name = tech.name
-      for ht in Technician.HOUR_TYPES:
-        new_tech.hours[ht] = tech.hours.get(ht, 0)
+    from docassemble.quadralocate.objects import HOUR_TYPES
+    # Unique dates in order of first appearance
+    dates_seen = []
+    for entry in report.time_entries:
+      d = entry.date
+      if d not in dates_seen:
+        dates_seen.append(d)
+    for d in dates_seen:
+      day = report.job.work_days.appendObject()
+      day.date = d
+      day_entries = [e for e in report.time_entries if e.date == d]
+      if day_entries:
+        starts = [e.start_time for e in day_entries if e.start_time]
+        ends = [e.end_time for e in day_entries if e.end_time]
+        if starts:
+          day.start_time = min(starts)
+        if ends:
+          day.end_time = max(ends)
+      day.weather = report.weather
+      tech_names = []
+      for e in day_entries:
+        if e.technician_name and e.technician_name not in tech_names:
+          tech_names.append(e.technician_name)
+      for name in tech_names:
+        tech_entries = [e for e in day_entries if e.technician_name == name]
+        tech = day.technicians.appendObject()
+        tech.name = name
+        if tech_entries:
+          tech.start_time = tech_entries[0].start_time
+          tech.end_time = tech_entries[-1].end_time
+        for ht in HOUR_TYPES:
+          if ht == 'two_hr_min':
+            tech.hours[ht] = any(e.hours.get(ht) for e in tech_entries)
+          else:
+            tech.hours[ht] = sum(float(e.hours.get(ht, 0) or 0) for e in tech_entries)
     report.job.work_days.gathered = True
-  single_day_setup_complete = True
+    report.job.is_multi_day = (len(report.job.work_days) > 1)
+  time_entries_built = True
 ---
 # ============================================
-# TIME & BILLING - MULTI-DAY
-# ============================================
-question: |
-  Work Day ${ ordinal(i) }
-subquestion: |
-  Enter details for work day ${ i + 1 }.
-fields:
-  - Date: report.job.work_days[i].date
-    datatype: date
-  - Start Time: report.job.work_days[i].start_time
-    datatype: time
-  - End Time: report.job.work_days[i].end_time
-    datatype: time
-  - Weather Conditions: report.job.work_days[i].weather
-    required: False
-section: time_billing
----
-question: |
-  Any more work days?
-subquestion: |
-  You have entered ${ report.job.work_days.number_as_word() } work day(s).
-  
-  Are there any more work days to add?
-yesno: report.job.work_days.there_is_another
----
-question: |
-  Technician ${ ordinal(j) } for ${ report.job.work_days[i].date }
-subquestion: |
-  Enter details for technician ${ j + 1 } on this day.
-fields:
-  - Technician Name: report.job.work_days[i].technicians[j].name
-  - EM Hours: report.job.work_days[i].technicians[j].hours['em']
-    datatype: number
-    required: False
-    default: 0
-  - GPR Hours: report.job.work_days[i].technicians[j].hours['gpr']
-    datatype: number
-    required: False
-    default: 0
-  - Travel Hours: report.job.work_days[i].technicians[j].hours['travel']
-    datatype: number
-    required: False
-    default: 0
-  - Survey Hours: report.job.work_days[i].technicians[j].hours['survey']
-    datatype: number
-    required: False
-    default: 0
-  - Concrete GPR Hours: report.job.work_days[i].technicians[j].hours['concrete_gpr']
-    datatype: number
-    required: False
-    default: 0
-  - Standby Hours: report.job.work_days[i].technicians[j].hours['standby']
-    datatype: number
-    required: False
-    default: 0
-section: time_billing
----
-# Define DADict gathering: hours always has entries (fixed keys from question)
-code: |
-  report.job.work_days[i].technicians[j].hours.there_are_any = True
----
-question: |
-  Any more technicians for ${ report.job.work_days[i].date }?
-subquestion: |
-  You have entered ${ report.job.work_days[i].technicians.number_as_word() } technician(s) for this day.
-  
-  Are there any more technicians to add for this day?
-yesno: report.job.work_days[i].technicians.there_is_another
----
-# ============================================
-# SUPPLEMENTAL CHARGES
+# SUPPLEMENTAL CHARGES (1 question)
 # ============================================
 question: |
   Supplemental Charges
@@ -310,33 +278,31 @@ fields:
   - Traffic Control: report.supp_traffic_control
     datatype: yesnoradio
     required: False
-  - Permitting: report.supp_permits
-    required: False
-  - Desktop Review: report.supp_desktop
-    required: False
-  - AutoCAD: report.supp_cad
-    required: False
-  - Coring: report.supp_coring
-    required: False
-  - Vapour Probes: report.supp_vapour_probes
-    required: False
-  - Camera Inspection: report.supp_camera
-    required: False
-  - Data Processing: report.supp_data_processing
-    required: False
-  - Orientation Time: report.supp_orientation
-    required: False
-  - Report Drafting: report.supp_sketch
-    required: False
-  - Kilometres Driven: report.supp_kms
-    datatype: number
+  - Permitting: report.supp_permitting
+    datatype: yesnoradio
     required: False
   - LOA: report.supp_loa
+    datatype: yesnoradio
+    required: False
+  - Desktop Review: report.supp_desktop
+    datatype: yesnoradio
+    required: False
+  - AutoCAD: report.supp_cad
+    datatype: yesnoradio
+    required: False
+  - Concrete Coring: report.supp_coring
+    datatype: yesnoradio
+    required: False
+  - Vapour Probes: report.supp_vapour_probes
+    datatype: yesnoradio
+    required: False
+  - Data Processing: report.supp_data_processing
+    datatype: yesnoradio
     required: False
 section: time_billing
 ---
 # ============================================
-# MATERIALS
+# MATERIALS USED (1 question)
 # ============================================
 question: |
   Materials Used
@@ -349,6 +315,9 @@ fields:
     required: False
   - 'Lathe 48"': report.mat_lathe_48
     datatype: integer
+    required: False
+  - KMs Driven: report.mat_kms
+    datatype: number
     required: False
 section: time_billing
 ---
@@ -857,7 +826,6 @@ section: review
 mandatory: True
 code: |
   report_action
-  report.job.is_multi_day
   report.client_company
   report.quadra_job_number
   report.site_address
@@ -866,16 +834,24 @@ code: |
   report.technician_name
   report.client_rep_name
   
-  # Time and billing
-  if not report.job.is_multi_day:
-    single_day_start_time
-    single_day_end_time
-    single_day_technicians.gather()
-    single_day_setup_complete
-  else:
-    report.job.work_days.gather()
-    for day in report.job.work_days:
-      day.technicians.gather()
+  # Time and billing: Table 1 + Table 2, then build work_days
+  report.time_entries.gather()
+  for idx in range(len(report.time_entries)):
+    report.time_entries[idx].date
+    report.time_entries[idx].technician_name
+    report.time_entries[idx].start_time
+    report.time_entries[idx].end_time
+    report.time_entries[idx].hours['em']
+    report.time_entries[idx].hours['gpr']
+    report.time_entries[idx].hours['travel']
+    report.time_entries[idx].hours['gps_survey']
+    report.time_entries[idx].hours['rts_survey']
+    report.time_entries[idx].hours['two_hr_min']
+    report.time_entries[idx].hours['orientations']
+    report.time_entries[idx].hours['sketch_drafting']
+    report.time_entries[idx].hours['ferry_standby']
+    report.time_entries[idx].hours['camera_inspection']
+  time_entries_built
   
   report.property_type
   
