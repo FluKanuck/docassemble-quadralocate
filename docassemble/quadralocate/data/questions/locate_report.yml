@@ -170,6 +170,9 @@ subquestion: |
   Add another row (e.g. another day or another technician)?
 yesno: report.time_entries.there_is_another
 section: time_billing
+show if:
+  variable: report.time_entries
+  min length: 1
 ---
 # ============================================
 # TIME & BILLING - Table 2: Hour breakdown per entry
@@ -834,7 +837,11 @@ code: |
   report.technician_name
   report.client_rep_name
   
-  # Time and billing: Table 1 + Table 2, then build work_days
+  # Time and billing: Table 1 (first entry first), then gather, then Table 2, then build
+  report.time_entries[0].date
+  report.time_entries[0].technician_name
+  report.time_entries[0].start_time
+  report.time_entries[0].end_time
   report.time_entries.gather()
   for idx in range(len(report.time_entries)):
     report.time_entries[idx].date
