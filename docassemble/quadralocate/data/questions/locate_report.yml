@@ -53,7 +53,7 @@ subquestion: |
   
   **Start a new report** or **resume an existing job**.
   
-  <small class="text-muted">Version 1.1.9</small>
+  <small class="text-muted">Version 1.1.10</small>
 field: report_action
 buttons:
   - Start New Report: new
@@ -230,7 +230,7 @@ code: |
 # Build work_days and technicians from time_entries (for report/PDF)
 code: |
   if not report.job.work_days.has_been_gathered():
-    from docassemble.quadralocate.objects import HOUR_TYPES
+    from docassemble.quadralocate.objects import HOUR_TYPES, HoursDict
     # Unique dates in order of first appearance
     dates_seen = []
     for entry in report.time_entries:
@@ -265,12 +265,9 @@ code: |
             tech.hours[ht] = any(e.hours.get(ht) for e in tech_entries)
           else:
             tech.hours[ht] = sum(float(e.hours.get(ht, 0) or 0) for e in tech_entries)
+        tech.hours = HoursDict(dict(tech.hours))
     report.job.work_days.gathered = True
     report.job.is_multi_day = (len(report.job.work_days) > 1)
-    # Set hours.there_are_any on each technician by index so docassemble finds the variable
-    for day_idx in range(len(report.job.work_days)):
-      for tech_idx in range(len(report.job.work_days[day_idx].technicians)):
-        report.job.work_days[day_idx].technicians[tech_idx].hours.there_are_any = True
   time_entries_built = True
 ---
 # ============================================

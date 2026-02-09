@@ -3,6 +3,17 @@ Custom Python objects for Quadra Utility Locate Report
 """
 from docassemble.base.util import DAObject, DAList, DADict, format_time, format_date
 from datetime import datetime, time
+import json
+import time as time_module
+
+# #region agent log
+def _debug_log(location, message, data=None, hypothesis_id=None):
+    try:
+        with open(r'q:\QuadDoc\.cursor\debug.log', 'a', encoding='utf-8') as f:
+            f.write(json.dumps({"timestamp": int(time_module.time() * 1000), "location": location, "message": message, "data": data or {}, "hypothesisId": hypothesis_id or ""}) + "\n")
+    except Exception:
+        pass
+# #endregion
 
 __all__ = [
     'UtilityType',
@@ -14,7 +25,8 @@ __all__ = [
     'HydrovacRecommendation',
     'PhotoPage',
     'Drawing',
-    'LocateReport'
+    'LocateReport',
+    'HoursDict',
 ]
 
 
@@ -122,6 +134,11 @@ HOUR_LABELS = {
 HOUR_TYPES_NUMERIC = [k for k in HOUR_TYPES if k != 'two_hr_min']
 
 
+class HoursDict(dict):
+    """Plain dict with there_are_any so docassemble never looks for a question to define it."""
+    there_are_any = True
+
+
 class TimeEntry(DAObject):
     """One row in Table 1: date, technician name, start/end time; hours filled in Table 2."""
     
@@ -141,12 +158,18 @@ class Technician(DAObject):
     
     def init(self, *pargs, **kwargs):
         super().init(*pargs, **kwargs)
+        # #region agent log
+        _debug_log("Technician.init", "entry", {"intrinsicName": getattr(self, 'intrinsicName', None)}, "H1")
+        # #endregion
         self.initializeAttribute('hours', DADict)
         for hour_type in self.HOUR_TYPES:
             if hour_type not in self.hours:
                 self.hours[hour_type] = 0 if hour_type != 'two_hr_min' else False
         self.hours.there_are_any = True  # So docassemble never looks for a question to define it
-    
+        # #region agent log
+        _debug_log("Technician.init", "exit set there_are_any", {"intrinsicName": getattr(self, 'intrinsicName', None), "has_there_are_any": getattr(self.hours, 'there_are_any', None)}, "H1")
+        # #endregion
+
     def has_any_hours(self):
         """Check if technician has any hours or 2Hr Min recorded."""
         for hour_type in HOUR_TYPES_NUMERIC:
@@ -271,8 +294,11 @@ class MultiDayJob(DAObject):
     
     def format_type_time(self):
         """Format TYPE/TIME section with per-tech or per-day breakdown."""
+        # #region agent log
+        _debug_log("MultiDayJob.format_type_time", "entry", {"num_work_days": len(self.work_days), "is_multi_day": getattr(self, 'is_multi_day', None)}, "H4")
+        # #endregion
         lines = []
-        
+
         if not self.is_multi_day or len(self.work_days) <= 1:
             # Single day - list technicians
             if self.work_days:
@@ -288,10 +314,16 @@ class MultiDayJob(DAObject):
                         lines.append(f"Total: {totals_line}")
         else:
             # Multi-day - show daily breakdown
-            for day in self.work_days:
+            for day_idx, day in enumerate(self.work_days):
+                # #region agent log
+                _debug_log("format_type_time", "day loop", {"day_idx": day_idx, "num_technicians": len(day.technicians)}, "H5")
+                # #endregion
                 date_str = format_date(day.date, format='short') if hasattr(day, 'date') else 'Unknown'
                 tech_parts = []
-                for tech in day.technicians:
+                for tech_idx, tech in enumerate(day.technicians):
+                    # #region agent log
+                    _debug_log("format_type_time", "tech access", {"day_idx": day_idx, "tech_idx": tech_idx, "tech_intrinsic": getattr(tech, 'intrinsicName', None), "hours_has_there_are_any": getattr(getattr(tech, 'hours', None), 'there_are_any', 'N/A')}, "H5")
+                    # #endregion
                     if tech.has_any_hours():
                         tech_parts.append(tech.format_tech_line())
                 if tech_parts:
@@ -475,8 +507,11 @@ class LocateReport(DAObject):
     
     def format_billing_details(self):
         """Format the complete billing details section."""
+        # #region agent log
+        _debug_log("LocateReport.format_billing_details", "entry", {}, "H4")
+        # #endregion
         lines = []
-        
+
         # TIME ON SITE
         time_on_site = self.job.format_time_on_site()
         if time_on_site:
