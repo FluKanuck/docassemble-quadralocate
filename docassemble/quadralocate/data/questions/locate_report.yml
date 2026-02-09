@@ -53,7 +53,7 @@ subquestion: |
   
   **Start a new report** or **resume an existing job**.
   
-  <small class="text-muted">Version 1.1.8</small>
+  <small class="text-muted">Version 1.1.9</small>
 field: report_action
 buttons:
   - Start New Report: new
