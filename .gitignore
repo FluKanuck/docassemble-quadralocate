@@ -24,6 +24,9 @@ wheels/
 # Environments
 .env
 .venv
+# Local Git credentials (never commit)
+.git-credentials.local
+.git-credentials.local.txt
 env/
 venv/
 

@@ -853,12 +853,12 @@ code: |
   if not report.job.is_multi_day:
     single_day_start_time
     single_day_end_time
-    single_day_technicians.gathered
+    single_day_technicians.gather()
     single_day_setup_complete
   else:
-    report.job.work_days.gathered
+    report.job.work_days.gather()
     for day in report.job.work_days:
-      day.technicians.gathered
+      day.technicians.gather()
   
   report.property_type
   
