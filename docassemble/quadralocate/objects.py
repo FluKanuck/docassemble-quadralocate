@@ -3,17 +3,7 @@ Custom Python objects for Quadra Utility Locate Report
 """
 from docassemble.base.util import DAObject, DAList, DADict, format_time, format_date
 from datetime import datetime, time
-import json
-import time as time_module
 
-# #region agent log
-def _debug_log(location, message, data=None, hypothesis_id=None):
-    try:
-        with open(r'q:\QuadDoc\.cursor\debug.log', 'a', encoding='utf-8') as f:
-            f.write(json.dumps({"timestamp": int(time_module.time() * 1000), "location": location, "message": message, "data": data or {}, "hypothesisId": hypothesis_id or ""}) + "\n")
-    except Exception:
-        pass
-# #endregion
 
 __all__ = [
     'UtilityType',
@@ -156,17 +146,11 @@ class Technician(DAObject):
     
     def init(self, *pargs, **kwargs):
         super().init(*pargs, **kwargs)
-        # #region agent log
-        _debug_log("Technician.init", "entry", {"intrinsicName": getattr(self, 'intrinsicName', None)}, "H1")
-        # #endregion
         self.initializeAttribute('hours', DADict)
         for hour_type in self.HOUR_TYPES:
             if hour_type not in self.hours:
                 self.hours[hour_type] = 0 if hour_type != 'two_hr_min' else False
         self.hours.there_are_any = True  # So docassemble never looks for a question to define it
-        # #region agent log
-        _debug_log("Technician.init", "exit set there_are_any", {"intrinsicName": getattr(self, 'intrinsicName', None), "has_there_are_any": getattr(self.hours, 'there_are_any', None)}, "H1")
-        # #endregion
 
     def has_any_hours(self):
         """Check if technician has any hours or 2Hr Min recorded."""
@@ -292,9 +276,6 @@ class MultiDayJob(DAObject):
     
     def format_type_time(self):
         """Format TYPE/TIME section with per-tech or per-day breakdown."""
-        # #region agent log
-        _debug_log("MultiDayJob.format_type_time", "entry", {"num_work_days": len(self.work_days), "is_multi_day": getattr(self, 'is_multi_day', None)}, "H4")
-        # #endregion
         lines = []
 
         if not self.is_multi_day or len(self.work_days) <= 1:
@@ -313,15 +294,9 @@ class MultiDayJob(DAObject):
         else:
             # Multi-day - show daily breakdown
             for day_idx, day in enumerate(self.work_days):
-                # #region agent log
-                _debug_log("format_type_time", "day loop", {"day_idx": day_idx, "num_technicians": len(day.technicians)}, "H5")
-                # #endregion
                 date_str = format_date(day.date, format='short') if hasattr(day, 'date') else 'Unknown'
                 tech_parts = []
                 for tech_idx, tech in enumerate(day.technicians):
-                    # #region agent log
-                    _debug_log("format_type_time", "tech access", {"day_idx": day_idx, "tech_idx": tech_idx, "tech_intrinsic": getattr(tech, 'intrinsicName', None), "hours_has_there_are_any": getattr(getattr(tech, 'hours', None), 'there_are_any', 'N/A')}, "H5")
-                    # #endregion
                     if tech.has_any_hours():
                         tech_parts.append(tech.format_tech_line())
                 if tech_parts:
@@ -437,8 +412,8 @@ class LocateReport(DAObject):
         self.initializeAttribute('job', MultiDayJob)
         self.initializeAttribute('hydrovac', HydrovacRecommendation)
         self.initializeAttribute('missing_docs', DADict)
-        self.initializeAttribute('photo_pages', DAList.using(object_type=PhotoPage))
-        self.initializeAttribute('drawings', DAList.using(object_type=Drawing))
+        self.initializeAttribute('photo_pages', DAList.using(object_type=PhotoPage, auto_gather=False))
+        self.initializeAttribute('drawings', DAList.using(object_type=Drawing, auto_gather=False))
         self.num_photo_pages = 1
         self.num_drawings = 1
         self.revision_number = 0
@@ -505,9 +480,6 @@ class LocateReport(DAObject):
     
     def format_billing_details(self):
         """Format the complete billing details section."""
-        # #region agent log
-        _debug_log("LocateReport.format_billing_details", "entry", {}, "H4")
-        # #endregion
         lines = []
 
         # TIME ON SITE
@@ -606,8 +578,10 @@ class LocateReport(DAObject):
             if section:
                 sections.append(section)
         
-        # Storm and Sanitary combined (special handling)
-        # Already handled in utilities
+        # Storm/sanitary combined summary (gathered as a single field)
+        storm_san_summary = getattr(self, 'storm_sanitary_summary', '') or ''
+        if storm_san_summary:
+            sections.append(f"STORM AND SANITARY DETAILS:\r{storm_san_summary}")
         
         # Hydrovac recommendation
         hydrovac_section = self.hydrovac.format_section()
@@ -663,8 +637,8 @@ def format_time_12hr(time_val):
                 return f"12:{minute:02d} pm"
             else:
                 return f"{hour - 12}:{minute:02d} pm"
-        except:
-            return time_val
+        except (ValueError, IndexError, TypeError):
+            return str(time_val)
     
     if isinstance(time_val, time):
         hour = time_val.hour

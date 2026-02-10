@@ -1,4 +1,4 @@
 # Quadra Utility Locating Site Report
 # DocAssemble Interview Package
 
-__version__ = '1.1.13'
+__version__ = '1.2.0'
