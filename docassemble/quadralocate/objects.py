@@ -374,16 +374,29 @@ class HydrovacRecommendation(DAObject):
 
 
 class PhotoPage(DAObject):
-    """Represents a page of photos in the report."""
+    """Represents a page of up to 6 photos with individual captions."""
+    
+    SLOTS = range(1, 7)  # 1-6
     
     def init(self, *pargs, **kwargs):
         super().init(*pargs, **kwargs)
-        # Do NOT set self.photos or self.comments here — they must remain
-        # undefined so Docassemble shows the photo upload question.
+        # Do NOT set photo_1..photo_6 or comment_1..comment_6 here —
+        # they must remain undefined so Docassemble shows the question.
+    
+    def get_photos_with_comments(self):
+        """Yield (photo, comment) for each slot that has an uploaded photo."""
+        for n in self.SLOTS:
+            photo = getattr(self, f'photo_{n}', None)
+            if photo:
+                yield photo, getattr(self, f'comment_{n}', '') or ''
     
     def has_content(self):
-        """Check if this page has any photos or comments."""
-        return (self.photos and len(self.photos) > 0) or self.comments
+        """Check if any slot has an uploaded photo."""
+        return any(True for _ in self.get_photos_with_comments())
+    
+    def photo_count(self):
+        """Return the number of photos uploaded on this page."""
+        return sum(1 for _ in self.get_photos_with_comments())
 
 
 class Drawing(DAObject):

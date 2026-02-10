@@ -73,28 +73,22 @@
 
 # Photos and Comments
 
-{% if report.photo_pages and report.num_photo_pages > 0 %}
 {% for photo_page in report.photo_pages %}
 {% if photo_page.has_content() %}
 
-## Photo Page {{ photo_page.page_number }}
+## Photo Page {{ loop.index }}
 
-{% if photo_page.photos %}
-{% for photo in photo_page.photos %}
+{% for photo, caption in photo_page.get_photos_with_comments() %}
 {{ photo }}
 
-{% endfor %}
-{% endif %}
+{% if caption %}*{{ caption }}*{% endif %}
 
-{% if photo_page.comments %}
-{{ photo_page.comments }}
-{% endif %}
+{% endfor %}
 
 ---
 
 {% endif %}
 {% endfor %}
-{% endif %}
 
 # Locate Drawings
 

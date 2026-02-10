@@ -339,6 +339,32 @@ All previous fixes (ISS-012 through ISS-015) verified intact.
 
 ---
 
+### ISS-017 — Photo page redesign: 6 paired photo/caption slots per page
+
+| Detail | Value |
+|--------|-------|
+| **Date opened** | 2026-02-10 |
+| **Date resolved** | 2026-02-10 |
+| **Status** | **RESOLVED** |
+| **Version** | 1.2.9 |
+| **Commits** | *(see git log)* |
+
+**Symptom:** The old photo upload used a single multi-file upload + single comment per page, preceded by a "how many pages?" count question. The user requested 6 individual photo slots per page, each with its own caption, all optional, with the ability to add more pages, and no export of empty pages.
+
+**What we tried:**
+1. Redesigned `PhotoPage` class in `objects.py` to use 6 individual `photo_N`/`comment_N` attributes (N=1..6) with `get_photos_with_comments()` and `has_content()` helpers.
+2. Replaced the two YAML questions (count question + per-page upload) with a single 6-slot question using `continue button field` and an `add_another` toggle.
+3. Updated the mandatory block to use a manual `while`-loop on `add_another` instead of a count-based `for` loop.
+4. Updated `locate_report.md` template to iterate over slots, rendering only uploaded photos with their captions, and skipping empty pages.
+5. Updated review screen to show actual photo count instead of `num_photo_pages`.
+6. Added `there_is_another = False` safety-net code block for `report.photo_pages` (DAList invariant).
+
+**What worked:** All of the above changes together. The `there_is_another = False` block and `gathered = True` in the mandatory block follow the same safe patterns established in ISS-012/ISS-016.
+
+**Lesson learned:** When replacing a count-based loop with a dynamic `add_another` pattern, the mandatory block must manually walk the list indices and set `gathered = True` after the loop ends, with a `there_is_another = False` safety-net code block.
+
+---
+
 <!-- 
   ┌──────────────────────────────────────────────────────────────────┐
   │  TEMPLATE — Copy this block when adding a new issue.            │

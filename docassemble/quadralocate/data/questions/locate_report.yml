@@ -6,7 +6,7 @@ metadata:
   authors:
     - name: Quadra Utility Locating Ltd.
   revision_date: 2026-02-10
-  version: 1.2.8
+  version: 1.2.9
 ---
 modules:
   - docassemble.quadralocate.objects
@@ -61,7 +61,7 @@ question: |
 subquestion: |
   Welcome to the Quadra Utility Locate Report system.
   
-  <small class="text-muted">Version 1.2.8</small>
+  <small class="text-muted">Version 1.2.9</small>
 field: report_action
 buttons:
   - Start New Report: new
@@ -717,35 +717,72 @@ fields:
 section: recommendations
 ---
 # ============================================
-# PHOTOS
+# PHOTOS (6 slots per page, paired photo + caption)
 # ============================================
-question: |
-  Site Photos
-subquestion: |
-  How many photo pages will be included in this report?
-fields:
-  - Number of photo pages: report.num_photo_pages
-    datatype: integer
-    min: 0
-    max: 10
-    default: 1
-section: media
----
 question: |
   Photo Page ${ i + 1 }
 subquestion: |
-  Upload photos for page ${ i + 1 } of ${ report.num_photo_pages }.
+  Upload up to 6 photos for this page. Each photo can have an optional caption.
+  Leave slots empty if not needed.
 fields:
-  - Photos for this page: report.photo_pages[i].photos
-    datatype: files
+  - note: |
+      **Photo 1**
+  - Photo: report.photo_pages[i].photo_1
+    datatype: file
     required: False
-  - Comments for this page: report.photo_pages[i].comments
-    datatype: area
+  - Caption: report.photo_pages[i].comment_1
     required: False
+  - note: |
+      ---
+      **Photo 2**
+  - Photo: report.photo_pages[i].photo_2
+    datatype: file
+    required: False
+  - Caption: report.photo_pages[i].comment_2
+    required: False
+  - note: |
+      ---
+      **Photo 3**
+  - Photo: report.photo_pages[i].photo_3
+    datatype: file
+    required: False
+  - Caption: report.photo_pages[i].comment_3
+    required: False
+  - note: |
+      ---
+      **Photo 4**
+  - Photo: report.photo_pages[i].photo_4
+    datatype: file
+    required: False
+  - Caption: report.photo_pages[i].comment_4
+    required: False
+  - note: |
+      ---
+      **Photo 5**
+  - Photo: report.photo_pages[i].photo_5
+    datatype: file
+    required: False
+  - Caption: report.photo_pages[i].comment_5
+    required: False
+  - note: |
+      ---
+      **Photo 6**
+  - Photo: report.photo_pages[i].photo_6
+    datatype: file
+    required: False
+  - Caption: report.photo_pages[i].comment_6
+    required: False
+  - note: |
+      ---
+  - Add another photo page?: report.photo_pages[i].add_another
+    datatype: yesnoradio
+    default: False
+continue button field: report.photo_pages[i].page_complete
 section: media
 ---
+# Safety net for photo_pages DAList (same pattern as ISS-012/ISS-016)
 code: |
-  report.photo_pages[i].page_number = i + 1
+  report.photo_pages.there_is_another = False
 ---
 # ============================================
 # DRAWINGS
@@ -836,7 +873,7 @@ subquestion: |
   
   ### Media Attachments
   
-  - **Photo Pages:** ${ report.num_photo_pages }
+  - **Photo Pages:** ${ len(report.photo_pages) } (${ sum(p.photo_count() for p in report.photo_pages if p.has_content()) } photos)
   - **Drawings:** ${ report.num_drawings }
   % if report.num_drawings > 0:
   % for drawing in report.drawings:
@@ -924,12 +961,13 @@ code: |
   report.missing_docs['hydro']
   report.recommendations
   
-  # Photos
-  report.num_photo_pages
-  if report.num_photo_pages > 0:
-    for idx in range(report.num_photo_pages):
-      report.photo_pages[idx].photos
-    report.photo_pages.gathered = True
+  # Photos (manual loop — avoids DAList gather protocol)
+  report.photo_pages[0].page_complete
+  photo_idx = 0
+  while report.photo_pages[photo_idx].add_another:
+    photo_idx += 1
+    report.photo_pages[photo_idx].page_complete
+  report.photo_pages.gathered = True
   
   # Drawings
   report.num_drawings
