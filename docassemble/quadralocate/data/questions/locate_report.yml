@@ -6,7 +6,7 @@ metadata:
   authors:
     - name: Quadra Utility Locating Ltd.
   revision_date: 2026-02-10
-  version: 1.2.0
+  version: 1.2.1
 ---
 modules:
   - docassemble.quadralocate.objects
@@ -61,7 +61,7 @@ question: |
 subquestion: |
   Welcome to the Quadra Utility Locate Report system.
   
-  <small class="text-muted">Version 1.2.0</small>
+  <small class="text-muted">Version 1.2.1</small>
 field: report_action
 buttons:
   - Start New Report: new
@@ -218,6 +218,11 @@ fields:
     default: 0
 continue button field: report.time_entries[i].hours_entered
 section: time_billing
+---
+# list collect: True gathers all items on one screen, so there_is_another is always False.
+# Without this block, gather() cannot resolve there_is_another on re-evaluation.
+code: |
+  report.time_entries.there_is_another = False
 ---
 # Define DADict gathering for Table 2
 code: |
