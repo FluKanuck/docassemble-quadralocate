@@ -313,6 +313,32 @@
 
 ---
 
+### ISS-016 — `report.job.work_days.there_is_another` lookup after hour breakdowns
+
+| Detail | Value |
+|--------|-------|
+| **Date opened** | 2026-02-10 |
+| **Date resolved** | 2026-02-10 |
+| **Status** | **RESOLVED** |
+| **Version** | 1.2.5 |
+| **Commits** | *(included in 1.2.5 commit)* |
+
+**Symptom:** After completing all hour breakdowns and clicking Next, the interview crashes with: *"There was a reference to a variable 'report.job.work_days.there_is_another' that could not be looked up."*
+
+**What we tried:**
+1. Traced the flow: mandatory block reaches `time_entries_built` → build code runs → creates work_days and technicians via `appendObject()` → line 271 calls `len(report.job.work_days)` **before** line 272 sets `gathered = True` → `len()` on an un-gathered DAList triggers the gather protocol → asks `there_is_another` → not defined → crash. Also, `day.technicians.gathered = True` was set **before** the technician append loop (line 252), but `appendObject()` resets `gathered`, leaving technicians un-gathered too.
+
+**What worked:** Three changes:
+1. Moved `report.job.work_days.gathered = True` **before** the `len()` call (after all appendObject calls are complete).
+2. Moved `day.technicians.gathered = True` to **after** the technician append loop (so it isn't reset by appendObject).
+3. Added `there_is_another = False` fallback code blocks for both `report.job.work_days` and `report.job.work_days[i].technicians` — same safety-net pattern that fixed ISS-012 for `time_entries`. This ensures the gather protocol can always complete even if gathered is unexpectedly reset.
+
+All previous fixes (ISS-012 through ISS-015) verified intact.
+
+**Lesson learned:** For manually-built DALists: (a) always set `gathered = True` **after** the last `appendObject()`, and (b) always provide a `there_is_another = False` code block as a safety net.
+
+---
+
 <!-- 
   ┌──────────────────────────────────────────────────────────────────┐
   │  TEMPLATE — Copy this block when adding a new issue.            │

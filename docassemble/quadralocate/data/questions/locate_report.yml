@@ -6,7 +6,7 @@ metadata:
   authors:
     - name: Quadra Utility Locating Ltd.
   revision_date: 2026-02-10
-  version: 1.2.4
+  version: 1.2.5
 ---
 modules:
   - docassemble.quadralocate.objects
@@ -61,7 +61,7 @@ question: |
 subquestion: |
   Welcome to the Quadra Utility Locate Report system.
   
-  <small class="text-muted">Version 1.2.4</small>
+  <small class="text-muted">Version 1.2.5</small>
 field: report_action
 buttons:
   - Start New Report: new
@@ -249,7 +249,6 @@ code: |
         if ends:
           day.end_time = max(ends)
       day.weather = report.weather
-      day.technicians.gathered = True
       tech_names = []
       for e in day_entries:
         if e.technician_name and e.technician_name not in tech_names:
@@ -268,8 +267,12 @@ code: |
           tech.start_time = tech_entries[0].start_time
           tech.end_time = tech_entries[-1].end_time
         tech.hours = HoursDict(hours_vals)
-    report.job.is_multi_day = (len(report.job.work_days) > 1)
+      # Set gathered AFTER all appendObject() calls — appendObject() resets it (ISS-016)
+      day.technicians.gathered = True
+    # Set gathered BEFORE len() — len() on an un-gathered DAList triggers the gather
+    # protocol which asks there_is_another, causing the lookup error (ISS-016).
     report.job.work_days.gathered = True
+    report.job.is_multi_day = (len(report.job.work_days) > 1)
   time_entries_built = True
 ---
 # Satisfy lookup for work_days[i].technicians[j].hours.there_are_any (docassemble seeks a defining block).
@@ -277,6 +280,14 @@ code: |
 # build code itself creates Technician objects whose init() accesses the hours DADict.
 code: |
   report.job.work_days[i].technicians[j].hours.there_are_any = True
+---
+# Manually-built lists need there_is_another = False so the gather protocol can
+# complete if triggered by len(), iteration, or re-evaluation (ISS-016).
+code: |
+  report.job.work_days.there_is_another = False
+---
+code: |
+  report.job.work_days[i].technicians.there_is_another = False
 ---
 # ============================================
 # SUPPLEMENTAL CHARGES (1 question)
