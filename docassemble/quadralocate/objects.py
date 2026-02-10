@@ -378,9 +378,8 @@ class PhotoPage(DAObject):
     
     def init(self, *pargs, **kwargs):
         super().init(*pargs, **kwargs)
-        self.page_number = 1
-        self.photos = None
-        self.comments = ""
+        # Do NOT set self.photos or self.comments here — they must remain
+        # undefined so Docassemble shows the photo upload question.
     
     def has_content(self):
         """Check if this page has any photos or comments."""
@@ -395,10 +394,8 @@ class Drawing(DAObject):
     
     def init(self, *pargs, **kwargs):
         super().init(*pargs, **kwargs)
-        self.page_number = 1
-        self.format = self.FORMAT_NORMAL
-        self.file = None
-        self.title = ""
+        # Do NOT set self.file, self.format, or self.title here — they must
+        # remain undefined so Docassemble shows the drawing upload question.
     
     def is_large_format(self):
         """Check if this is a large format drawing."""
@@ -422,8 +419,8 @@ class LocateReport(DAObject):
         self.initializeAttribute('missing_docs', DADict)
         self.initializeAttribute('photo_pages', DAList.using(object_type=PhotoPage, auto_gather=False))
         self.initializeAttribute('drawings', DAList.using(object_type=Drawing, auto_gather=False))
-        self.num_photo_pages = 1
-        self.num_drawings = 1
+        # Do NOT set num_photo_pages or num_drawings here — they must remain
+        # undefined so Docassemble shows the "how many" questions.
         self.revision_number = 0
     
     def format_bc1_display(self):
