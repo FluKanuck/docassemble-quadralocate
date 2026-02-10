@@ -6,7 +6,7 @@ metadata:
   authors:
     - name: Quadra Utility Locating Ltd.
   revision_date: 2026-02-10
-  version: 1.2.5
+  version: 1.2.6
 ---
 modules:
   - docassemble.quadralocate.objects
@@ -61,7 +61,7 @@ question: |
 subquestion: |
   Welcome to the Quadra Utility Locate Report system.
   
-  <small class="text-muted">Version 1.2.5</small>
+  <small class="text-muted">Version 1.2.6</small>
 field: report_action
 buttons:
   - Start New Report: new
@@ -879,6 +879,10 @@ code: |
   
   # Build work_days from time entries (all data now available)
   time_entries_built
+  
+  # Supplemental charges and materials
+  report.supp_parking
+  report.mat_pin_flags
   
   report.property_type
   
