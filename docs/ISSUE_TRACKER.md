@@ -252,6 +252,27 @@
 
 ---
 
+### ISS-013 — Infinite loop `x.there_are_any` after completing hour breakdowns
+
+| Detail | Value |
+|--------|-------|
+| **Date opened** | 2026-02-10 |
+| **Date resolved** | 2026-02-10 |
+| **Status** | **RESOLVED** |
+| **Version** | 1.2.2 |
+| **Commits** | *(included in 1.2.2 commit)* |
+
+**Symptom:** After completing the hour breakdown for all time entries and clicking Continue, the interview crashes with: *"There appears to be an infinite loop. Variables in stack are x.there_are_any."*
+
+**What we tried:**
+1. Traced the circular dependency: mandatory block requests `time_entries_built` → build code creates Technician via `appendObject()` → `Technician.init()` accesses the `hours` DADict before setting `there_are_any` → Docassemble looks up a code block → that block requires `time_entries_built` (which we're already computing) → infinite loop.
+
+**What worked:** Two changes:
+1. In `objects.py`, moved `self.hours.there_are_any = True` **before** the for-loop that accesses the DADict in both `TimeEntry.init()` and `Technician.init()`. This prevents the lookup from ever firing during init.
+2. In `locate_report.yml`, removed the `time_entries_built` dependency from the fallback code block that defines `report.job.work_days[i].technicians[j].hours.there_are_any`. The block now sets the attribute directly, eliminating the circular dependency.
+
+---
+
 <!-- 
   ┌──────────────────────────────────────────────────────────────────┐
   │  TEMPLATE — Copy this block when adding a new issue.            │

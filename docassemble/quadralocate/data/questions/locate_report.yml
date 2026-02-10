@@ -6,7 +6,7 @@ metadata:
   authors:
     - name: Quadra Utility Locating Ltd.
   revision_date: 2026-02-10
-  version: 1.2.1
+  version: 1.2.2
 ---
 modules:
   - docassemble.quadralocate.objects
@@ -61,7 +61,7 @@ question: |
 subquestion: |
   Welcome to the Quadra Utility Locate Report system.
   
-  <small class="text-muted">Version 1.2.1</small>
+  <small class="text-muted">Version 1.2.2</small>
 field: report_action
 buttons:
   - Start New Report: new
@@ -272,9 +272,10 @@ code: |
     report.job.work_days.gathered = True
   time_entries_built = True
 ---
-# Satisfy lookup for work_days[i].technicians[j].hours.there_are_any (docassemble seeks a defining block)
+# Satisfy lookup for work_days[i].technicians[j].hours.there_are_any (docassemble seeks a defining block).
+# Must NOT depend on time_entries_built — that creates a circular dependency because the
+# build code itself creates Technician objects whose init() accesses the hours DADict.
 code: |
-  time_entries_built
   report.job.work_days[i].technicians[j].hours.there_are_any = True
 ---
 # ============================================

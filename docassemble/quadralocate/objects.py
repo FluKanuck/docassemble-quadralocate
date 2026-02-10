@@ -132,10 +132,10 @@ class TimeEntry(DAObject):
     def init(self, *pargs, **kwargs):
         super().init(*pargs, **kwargs)
         self.initializeAttribute('hours', DADict)
+        self.hours.there_are_any = True  # Must be set BEFORE any dict access to avoid gather/lookup loops
         for hour_type in HOUR_TYPES:
             if hour_type not in self.hours:
                 self.hours[hour_type] = 0 if hour_type != 'two_hr_min' else False
-        self.hours.there_are_any = True  # Avoid DADict gather/lookup so Table 2 (hour breakdown) shows and no "input not processed"
 
 
 class Technician(DAObject):
@@ -147,10 +147,10 @@ class Technician(DAObject):
     def init(self, *pargs, **kwargs):
         super().init(*pargs, **kwargs)
         self.initializeAttribute('hours', DADict)
+        self.hours.there_are_any = True  # Must be set BEFORE any dict access to avoid gather/lookup loops
         for hour_type in self.HOUR_TYPES:
             if hour_type not in self.hours:
                 self.hours[hour_type] = 0 if hour_type != 'two_hr_min' else False
-        self.hours.there_are_any = True  # So docassemble never looks for a question to define it
 
     def has_any_hours(self):
         """Check if technician has any hours or 2Hr Min recorded."""
