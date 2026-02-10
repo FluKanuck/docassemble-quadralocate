@@ -145,6 +145,7 @@ class TimeEntry(DAObject):
         for hour_type in HOUR_TYPES:
             if hour_type not in self.hours:
                 self.hours[hour_type] = 0 if hour_type != 'two_hr_min' else False
+        self.hours.there_are_any = True  # Avoid DADict gather/lookup so Table 2 (hour breakdown) shows and no "input not processed"
 
 
 class Technician(DAObject):
