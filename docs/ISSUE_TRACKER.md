@@ -292,6 +292,27 @@
 
 ---
 
+### ISS-015 — `hours.new_item_name` persists despite ISS-014 fix (DADict.__setitem__ resets gathered)
+
+| Detail | Value |
+|--------|-------|
+| **Date opened** | 2026-02-10 |
+| **Date resolved** | 2026-02-10 |
+| **Status** | **RESOLVED** |
+| **Version** | 1.2.4 |
+| **Commits** | *(included in 1.2.4 commit)* |
+
+**Symptom:** Same `report.time_entries[0].hours.new_item_name` error as ISS-014, but occurring earlier — right after client information, before the time entries screen even appears. The ISS-014 fix (`gathered = True` in init) was in place but ineffective.
+
+**What we tried:**
+1. Traced the root cause deeper: `DADict.__setitem__` resets `gathered = False` every time a key is assigned. So the init() loop (`self.hours['em'] = 0`, etc.) undoes the `gathered = True` that was set just above it. Moving `gathered = True` after the loop wouldn't help either, because the Table 2 question's field assignments (`hours['em'] = user_value`) would reset it again on the next request cycle. Fighting DADict's gather protocol with attribute flags is a losing battle.
+
+**What worked:** Replaced `DADict` with `HoursDict` (a plain `dict` subclass already in the codebase) for the `hours` attribute in both `TimeEntry.init()` and `Technician.init()`. Plain dicts have no Docassemble gather protocol — no `there_are_any`, `gathered`, or `new_item_name` lookups. The `HoursDict` class carries `there_are_any = True` and `gathered = True` as class-level attributes for belt-and-suspenders safety. A `hasattr` guard prevents overwriting on re-initialization. Previous fixes (ISS-012 `there_is_another`, ISS-013 fallback blocks) remain intact as defense-in-depth.
+
+**Lesson learned:** DADict is the wrong tool for pre-populated, fixed-schema dictionaries. Use a plain dict (HoursDict) whenever the keys are known at creation time and no gather UI is needed.
+
+---
+
 <!-- 
   ┌──────────────────────────────────────────────────────────────────┐
   │  TEMPLATE — Copy this block when adding a new issue.            │

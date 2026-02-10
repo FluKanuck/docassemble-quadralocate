@@ -122,8 +122,10 @@ HOUR_TYPES_NUMERIC = [k for k in HOUR_TYPES if k != 'two_hr_min']
 
 
 class HoursDict(dict):
-    """Plain dict with there_are_any so docassemble never looks for a question to define it."""
+    """Plain dict — not a DADict — so docassemble never enters the gather protocol.
+    Class-level there_are_any and gathered prevent any residual Docassemble lookups."""
     there_are_any = True
+    gathered = True
 
 
 class TimeEntry(DAObject):
@@ -131,11 +133,13 @@ class TimeEntry(DAObject):
     
     def init(self, *pargs, **kwargs):
         super().init(*pargs, **kwargs)
-        self.initializeAttribute('hours', DADict)
-        self.hours.there_are_any = True   # Must be set BEFORE any dict access to avoid gather/lookup loops (ISS-013)
-        self.hours.gathered = True         # Dict is pre-populated; prevent gather protocol asking for new_item_name (ISS-014)
-        for hour_type in HOUR_TYPES:
-            if hour_type not in self.hours:
+        # Use HoursDict (plain dict) instead of DADict to completely bypass
+        # Docassemble's gather protocol (there_are_any / gathered / new_item_name).
+        # DADict.__setitem__ resets gathered=False on every key assignment, making it
+        # impossible to keep gathered=True — the root cause of ISS-014 and ISS-015.
+        if not hasattr(self, 'hours'):
+            self.hours = HoursDict()
+            for hour_type in HOUR_TYPES:
                 self.hours[hour_type] = 0 if hour_type != 'two_hr_min' else False
 
 
@@ -147,11 +151,11 @@ class Technician(DAObject):
     
     def init(self, *pargs, **kwargs):
         super().init(*pargs, **kwargs)
-        self.initializeAttribute('hours', DADict)
-        self.hours.there_are_any = True   # Must be set BEFORE any dict access to avoid gather/lookup loops (ISS-013)
-        self.hours.gathered = True         # Dict is pre-populated; prevent gather protocol asking for new_item_name (ISS-014)
-        for hour_type in self.HOUR_TYPES:
-            if hour_type not in self.hours:
+        # Use HoursDict (plain dict) — same rationale as TimeEntry (ISS-015).
+        # The build code later replaces this with HoursDict(hours_vals) anyway.
+        if not hasattr(self, 'hours'):
+            self.hours = HoursDict()
+            for hour_type in self.HOUR_TYPES:
                 self.hours[hour_type] = 0 if hour_type != 'two_hr_min' else False
 
     def has_any_hours(self):
