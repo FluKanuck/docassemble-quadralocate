@@ -5,7 +5,7 @@ metadata:
   description: Site Locate Report for Quadra Utility Locating Ltd.
   authors:
     - name: Quadra Utility Locating Ltd.
-  revision_date: 2026-02-09
+  revision_date: 2026-02-10
 ---
 modules:
   - docassemble.quadralocate.objects
@@ -62,7 +62,7 @@ subquestion: |
   
   **Start a new report** or **resume an existing job**.
   
-  <small class="text-muted">Version 1.1.12</small>
+  <small class="text-muted">Version 1.1.13</small>
 field: report_action
 buttons:
   - Start New Report: new
@@ -171,18 +171,6 @@ fields:
     required: False
 section: time_billing
 ---
-question: |
-  Any more time entries to add?
-subquestion: |
-  You have entered ${ report.time_entries.number_as_word() } entry(ies).
-  
-  Add another row (e.g. another day or another technician)?
-yesno: report.time_entries.there_is_another
-section: time_billing
-show if:
-  variable: report.time_entries
-  min length: 1
----
 # ============================================
 # TIME & BILLING - Table 2: Hour breakdown per entry
 # ============================================
@@ -230,6 +218,7 @@ fields:
     datatype: number
     required: False
     default: 0
+continue button field: report.time_entries[i].hours_entered
 section: time_billing
 ---
 # Define DADict gathering for Table 2
@@ -240,7 +229,6 @@ code: |
 code: |
   if not report.job.work_days.has_been_gathered():
     from docassemble.quadralocate.objects import HOUR_TYPES, HoursDict
-    report.job.work_days.gathered = True
     dates_seen = []
     for entry in report.time_entries:
       d = entry.date
@@ -278,6 +266,7 @@ code: |
           tech.end_time = tech_entries[-1].end_time
         tech.hours = HoursDict(hours_vals)
     report.job.is_multi_day = (len(report.job.work_days) > 1)
+    report.job.work_days.gathered = True
   time_entries_built = True
 ---
 # Satisfy lookup for work_days[i].technicians[j].hours.there_are_any (docassemble seeks a defining block)
@@ -865,27 +854,17 @@ code: |
   report.technician_name
   report.client_rep_name
   
-  # Time and billing: Table 1 (first entry first), then gather, then Table 2, then build
-  report.time_entries[0].date
-  report.time_entries[0].technician_name
-  report.time_entries[0].start_time
-  report.time_entries[0].end_time
+  # Time entries (Table 1 — list collect handles gathering)
   report.time_entries.gather()
+  
+  # Weather (must be defined before time_entries_built)
+  report.weather
+  
+  # Time entries (Table 2 — hour breakdown per entry)
   for idx in range(len(report.time_entries)):
-    report.time_entries[idx].date
-    report.time_entries[idx].technician_name
-    report.time_entries[idx].start_time
-    report.time_entries[idx].end_time
-    report.time_entries[idx].hours['em']
-    report.time_entries[idx].hours['gpr']
-    report.time_entries[idx].hours['travel']
-    report.time_entries[idx].hours['gps_survey']
-    report.time_entries[idx].hours['rts_survey']
-    report.time_entries[idx].hours['two_hr_min']
-    report.time_entries[idx].hours['orientations']
-    report.time_entries[idx].hours['sketch_drafting']
-    report.time_entries[idx].hours['ferry_standby']
-    report.time_entries[idx].hours['camera_inspection']
+    report.time_entries[idx].hours_entered
+  
+  # Build work_days from time entries (all data now available)
   time_entries_built
   
   report.property_type
