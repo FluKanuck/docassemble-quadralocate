@@ -339,7 +339,9 @@ class HydrovacRecommendation(DAObject):
     def init(self, *pargs, **kwargs):
         super().init(*pargs, **kwargs)
         self.initializeAttribute('reasons', DADict)
-        self.recommended = False
+        # Do NOT set self.recommended here — it must remain undefined so
+        # Docassemble shows the question. Setting it to False in init()
+        # causes the mandatory block to skip the hydrovac question entirely.
         self.custom_notes = ""
     
     def get_selected_reasons(self):

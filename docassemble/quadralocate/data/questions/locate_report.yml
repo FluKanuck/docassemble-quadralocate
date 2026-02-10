@@ -6,7 +6,7 @@ metadata:
   authors:
     - name: Quadra Utility Locating Ltd.
   revision_date: 2026-02-10
-  version: 1.2.6
+  version: 1.2.7
 ---
 modules:
   - docassemble.quadralocate.objects
@@ -61,7 +61,7 @@ question: |
 subquestion: |
   Welcome to the Quadra Utility Locate Report system.
   
-  <small class="text-muted">Version 1.2.6</small>
+  <small class="text-muted">Version 1.2.7</small>
 field: report_action
 buttons:
   - Start New Report: new
@@ -897,7 +897,11 @@ code: |
   report.utilities.ditch.methods['visual']
   report.utilities.unknown.methods['em']
   
-  # Conditional details
+  # Site conditions and travel notes (start of Locate Details section)
+  report.site_conditions
+  report.travel_notes
+  
+  # Conditional utility details
   if report.utilities.electrical.has_any_method():
     report.utilities.electrical.summary
   if report.utilities.communications.has_any_method():
@@ -910,9 +914,6 @@ code: |
     report.storm_sanitary_summary
   if report.utilities.unknown.has_any_method():
     report.utilities.unknown.summary
-  
-  report.site_conditions
-  report.travel_notes
   
   # Hydrovac
   report.hydrovac.recommended
