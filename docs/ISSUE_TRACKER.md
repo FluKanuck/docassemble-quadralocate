@@ -273,6 +273,25 @@
 
 ---
 
+### ISS-014 — `report.time_entries[0].hours.new_item_name` lookup after weather
+
+| Detail | Value |
+|--------|-------|
+| **Date opened** | 2026-02-10 |
+| **Date resolved** | 2026-02-10 |
+| **Status** | **RESOLVED** |
+| **Version** | 1.2.3 |
+| **Commits** | *(included in 1.2.3 commit)* |
+
+**Symptom:** After clicking Next on the weather screen, the interview crashes with: *"There was a reference to a variable 'report.time_entries[0].hours.new_item_name' that could not be looked up."* This appeared after the ISS-013 fix.
+
+**What we tried:**
+1. Traced the cause: The hours DADict on TimeEntry has `there_are_any = True` (set in init) but `gathered` was never set. When `gather()` verifies each TimeEntry's completeness, it touches the hours DADict. Docassemble sees "items exist but dict isn't gathered" and enters the DADict gather protocol, asking for `new_item_name` (the next key to add). Since no question defines that variable, it crashes.
+
+**What worked:** Added `self.hours.gathered = True` in both `TimeEntry.init()` and `Technician.init()`, immediately after `there_are_any = True`. This tells Docassemble the dict is pre-populated and complete — no gather protocol needed. The Table 2 hour breakdown question still works because it's driven by `continue button field: hours_entered`, not by the dict's gather protocol; it sets keys directly via `__setitem__`. Previous fixes (ISS-012: `there_is_another`, ISS-013: `there_are_any` order) remain intact.
+
+---
+
 <!-- 
   ┌──────────────────────────────────────────────────────────────────┐
   │  TEMPLATE — Copy this block when adding a new issue.            │

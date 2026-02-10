@@ -132,7 +132,8 @@ class TimeEntry(DAObject):
     def init(self, *pargs, **kwargs):
         super().init(*pargs, **kwargs)
         self.initializeAttribute('hours', DADict)
-        self.hours.there_are_any = True  # Must be set BEFORE any dict access to avoid gather/lookup loops
+        self.hours.there_are_any = True   # Must be set BEFORE any dict access to avoid gather/lookup loops (ISS-013)
+        self.hours.gathered = True         # Dict is pre-populated; prevent gather protocol asking for new_item_name (ISS-014)
         for hour_type in HOUR_TYPES:
             if hour_type not in self.hours:
                 self.hours[hour_type] = 0 if hour_type != 'two_hr_min' else False
@@ -147,7 +148,8 @@ class Technician(DAObject):
     def init(self, *pargs, **kwargs):
         super().init(*pargs, **kwargs)
         self.initializeAttribute('hours', DADict)
-        self.hours.there_are_any = True  # Must be set BEFORE any dict access to avoid gather/lookup loops
+        self.hours.there_are_any = True   # Must be set BEFORE any dict access to avoid gather/lookup loops (ISS-013)
+        self.hours.gathered = True         # Dict is pre-populated; prevent gather protocol asking for new_item_name (ISS-014)
         for hour_type in self.HOUR_TYPES:
             if hour_type not in self.hours:
                 self.hours[hour_type] = 0 if hour_type != 'two_hr_min' else False
