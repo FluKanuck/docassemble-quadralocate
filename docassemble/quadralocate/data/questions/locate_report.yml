@@ -6,7 +6,7 @@ metadata:
   authors:
     - name: Quadra Utility Locating Ltd.
   revision_date: 2026-02-11
-  version: 1.5.15
+  version: 1.5.16
 ---
 modules:
   - docassemble.quadralocate.objects
@@ -92,7 +92,7 @@ question: |
 subquestion: |
   Welcome to the Quadra Utility Locate Report system.
   
-  <small class="text-muted">Version 1.5.15</small>
+  <small class="text-muted">Version 1.5.16</small>
 field: report_action
 buttons:
   - Start New Report: new
