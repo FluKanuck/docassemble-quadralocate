@@ -365,6 +365,33 @@ All previous fixes (ISS-012 through ISS-015) verified intact.
 
 ---
 
+### ISS-018 — PDF export redesign: per-page-type fillable PDF templates with pdf_concatenate
+
+| Detail | Value |
+|--------|-------|
+| **Date opened** | 2026-02-10 |
+| **Date resolved** | 2026-02-10 |
+| **Status** | **RESOLVED** |
+| **Version** | 1.3.0 |
+| **Commits** | *(see git log)* |
+
+**Symptom:** The existing PDF export used a single Markdown template (`locate_report.md`) converted to a plain, unstyled PDF. The output did not match the professionally designed Quadra Locate Sheet (v15 rev7) with its branded headers, structured layouts, and per-page-type formatting.
+
+**What we tried:**
+1. Redesigned the entire PDF export pipeline to use fillable PDF templates (one per page type) assembled via `pdf_concatenate()`.
+2. Created 5 attachment blocks: `cover_page.pdf`, `report_page.pdf`, `photo_page.pdf`, `drawing_page_letter.pdf`, `drawing_page_wide.pdf`, plus a static `legend_page.pdf`.
+3. Added Python field-mapping methods: `get_cover_fields()`, `get_report_fields()`, `get_export_filename()` on `LocateReport`; `get_photo_fields()` on `PhotoPage`; `get_drawing_fields()` on `Drawing`.
+4. Added new interview questions: `cover_photo` (optional file upload for cover page) and `missing_docs_other` (free-text "Other" missing docs field).
+5. Removed in-interview client signature collection — signature is now a digital signature field left signable on the exported PDF.
+6. Updated export filename to `YYYY-MM-DD Client Company Site Address QJN.pdf`.
+7. Drawing pages use two templates: `drawing_page_letter.pdf` for normal format and `drawing_page_wide.pdf` for large format (11x17/tabloid), selected per drawing based on `drawing.format`.
+
+**What worked:** All of the above changes together. The old `locate_report.md` is kept for reference but is no longer the primary export. The user must still complete the design-side work: export individual pages from InDesign, add form fields in Acrobat Pro with the exact field names, and place them in `data/templates/` and `data/static/`.
+
+**Lesson learned:** Docassemble's `pdf_concatenate()` with per-page-type `pdf template file` attachments gives full control over page layout while keeping the code modular. Each page type can be designed independently and repeated any number of times.
+
+---
+
 <!-- 
   ┌──────────────────────────────────────────────────────────────────┐
   │  TEMPLATE — Copy this block when adding a new issue.            │

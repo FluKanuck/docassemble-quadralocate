@@ -6,7 +6,7 @@ metadata:
   authors:
     - name: Quadra Utility Locating Ltd.
   revision_date: 2026-02-10
-  version: 1.2.9
+  version: 1.3.0
 ---
 modules:
   - docassemble.quadralocate.objects
@@ -40,7 +40,6 @@ sections:
   - hydrovac: Hydrovac
   - recommendations: Recommendations
   - media: Photos & Drawings
-  - signatures: Signatures
   - review: Review & Export
 ---
 # ============================================
@@ -61,7 +60,7 @@ question: |
 subquestion: |
   Welcome to the Quadra Utility Locate Report system.
   
-  <small class="text-muted">Version 1.2.9</small>
+  <small class="text-muted">Version 1.3.0</small>
 field: report_action
 buttons:
   - Start New Report: new
@@ -699,6 +698,8 @@ fields:
   - As-builts: report.missing_docs['asbuilts']
     datatype: yesno
     default: False
+  - Other (specify): report.missing_docs_other
+    required: False
 section: recommendations
 ---
 # ============================================
@@ -715,6 +716,20 @@ fields:
     datatype: area
     required: False
 section: recommendations
+---
+# ============================================
+# COVER PHOTO
+# ============================================
+question: |
+  Cover Photo
+subquestion: |
+  Upload an optional cover photo for the report cover page.
+fields:
+  - Cover Photo: report.cover_photo
+    datatype: file
+    required: False
+continue button field: report.cover_photo_complete
+section: media
 ---
 # ============================================
 # PHOTOS (6 slots per page, paired photo + caption)
@@ -961,6 +976,9 @@ code: |
   report.missing_docs['hydro']
   report.recommendations
   
+  # Cover photo (optional, for cover page template)
+  report.cover_photo_complete
+  
   # Photos (manual loop — avoids DAList gather protocol)
   report.photo_pages[0].page_complete
   photo_idx = 0
@@ -975,9 +993,6 @@ code: |
     for idx in range(report.num_drawings):
       report.drawings[idx].file
     report.drawings.gathered = True
-  
-  # Signatures
-  report.client_signature
   
   # Review
   review_complete
@@ -1014,17 +1029,76 @@ buttons:
   - Exit: exit
 section: review
 ---
+# ============================================
+# PDF TEMPLATE ATTACHMENTS (one per page type)
+# ============================================
+# Cover page
 attachment:
-  variable name: generated_report
-  name: Locate Report
-  filename: Quadra_Locate_Report_${ report.quadra_job_number }
-  content file: locate_report.md
-  valid formats:
-    - pdf
+  variable name: cover_pdf
+  name: Cover Page
+  filename: cover
+  pdf template file: cover_page.pdf
+  code: report.get_cover_fields()
 ---
+# Report page
+attachment:
+  variable name: report_pdf
+  name: Report Page
+  filename: report
+  pdf template file: report_page.pdf
+  code: report.get_report_fields()
+---
+# Photo pages (indexed — one per photo page with content)
+attachment:
+  variable name: report.photo_pages[i].filled_pdf
+  name: Photo Page ${ i + 1 }
+  filename: photo_page_${ i + 1 }
+  pdf template file: photo_page.pdf
+  code: report.photo_pages[i].get_photo_fields(i, report.quadra_job_number)
+---
+# Drawing pages — letter format
+attachment:
+  variable name: report.drawings[i].filled_pdf_letter
+  name: Drawing ${ i + 1 }
+  filename: drawing_${ i + 1 }
+  pdf template file: drawing_page_letter.pdf
+  code: report.drawings[i].get_drawing_fields(report.quadra_job_number)
+---
+# Drawing pages — wide/tabloid format
+attachment:
+  variable name: report.drawings[i].filled_pdf_wide
+  name: Drawing ${ i + 1 }
+  filename: drawing_${ i + 1 }
+  pdf template file: drawing_page_wide.pdf
+  code: report.drawings[i].get_drawing_fields(report.quadra_job_number)
+---
+# ============================================
+# DOWNLOAD — Assemble all pages via pdf_concatenate
+# ============================================
 event: download_report
 code: |
-  response(file=generated_report.pdf, content_type='application/pdf')
+  from docassemble.base.util import pdf_concatenate, DAStaticFile
+  
+  parts = [cover_pdf.pdf, report_pdf.pdf]
+  
+  # Photo pages — only include pages that have at least one photo
+  for idx, page in enumerate(report.photo_pages):
+    if page.has_content():
+      parts.append(page.filled_pdf.pdf)
+  
+  # Drawing pages — select letter or wide template based on format
+  for idx, drawing in enumerate(report.drawings):
+    if hasattr(drawing, 'file') and drawing.file:
+      if drawing.is_large_format():
+        parts.append(drawing.filled_pdf_wide.pdf)
+      else:
+        parts.append(drawing.filled_pdf_letter.pdf)
+  
+  # Legend page (static — no form fields)
+  parts.append(DAStaticFile(filename='data/static/legend_page.pdf'))
+  
+  final_report = pdf_concatenate(*parts, filename=report.get_export_filename())
+  response(file=final_report, content_type='application/pdf')
 ---
 # WARNING: revision_number increment is not atomic. If multiple users
 # trigger this event simultaneously, the count may be incorrect.

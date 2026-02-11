@@ -397,6 +397,20 @@ class PhotoPage(DAObject):
     def photo_count(self):
         """Return the number of photos uploaded on this page."""
         return sum(1 for _ in self.get_photos_with_comments())
+    
+    def get_photo_fields(self, page_index, job_number=''):
+        """Return dict mapping PDF form field names to values for this photo page."""
+        fields = {
+            'quadra_job_number': str(job_number),
+            'page_label': f'Photo Page {page_index + 1}',
+        }
+        for n in self.SLOTS:
+            photo = getattr(self, f'photo_{n}', None)
+            if photo:
+                fields[f'photo_{n}'] = photo
+            caption = getattr(self, f'comment_{n}', '') or ''
+            fields[f'caption_{n}'] = caption
+        return fields
 
 
 class Drawing(DAObject):
@@ -419,6 +433,17 @@ class Drawing(DAObject):
         if self.format == self.FORMAT_LARGE:
             return "Large Format (11x17)"
         return "Normal (Letter/A4)"
+    
+    def get_drawing_fields(self, job_number=''):
+        """Return dict mapping PDF form field names to values for this drawing."""
+        fields = {
+            'quadra_job_number': str(job_number),
+            'drawing_title': getattr(self, 'title', '') or '',
+        }
+        drawing_file = getattr(self, 'file', None)
+        if drawing_file:
+            fields['drawing_image'] = drawing_file
+        return fields
 
 
 class LocateReport(DAObject):
@@ -612,6 +637,65 @@ class LocateReport(DAObject):
             sections.append(reco_section)
         
         return "\r\r".join(sections)
+    
+    # ------------------------------------------------------------------
+    # PDF template field-mapping methods (for fillable PDF export)
+    # ------------------------------------------------------------------
+    
+    def get_cover_fields(self):
+        """Return dict mapping PDF form field names to values for the cover page."""
+        fields = {
+            'client_company': getattr(self, 'client_company', ''),
+            'quadra_job_number': getattr(self, 'quadra_job_number', ''),
+            'technician_name': getattr(self, 'technician_name', ''),
+            'site_visit_date': format_date(self.site_visit_date) if hasattr(self, 'site_visit_date') else '',
+            'site_address': getattr(self, 'site_address', ''),
+        }
+        cover = getattr(self, 'cover_photo', None)
+        if cover:
+            fields['cover_photo'] = cover
+        return fields
+    
+    def get_report_fields(self):
+        """Return dict mapping PDF form field names to values for the report page.
+        
+        The client_signature field is intentionally excluded — it is a digital
+        signature field in the PDF that the client signs on the exported document.
+        """
+        fields = {
+            'quadra_job_number': getattr(self, 'quadra_job_number', ''),
+            'bc1_call_number': self.format_bc1_display(),
+            'weather': getattr(self, 'weather', '') or '',
+            'billing_details': self.format_billing_details(),
+            'combined_report': self.format_combined_report(),
+            'client_po_number': getattr(self, 'client_po_number', '') or '',
+            'client_rep_name': getattr(self, 'client_rep_name', '') or '',
+            'client_job_number': getattr(self, 'client_job_number', '') or '',
+            'missing_other': getattr(self, 'missing_docs_other', '') or '',
+        }
+        # Missing docs checkboxes
+        doc_keys = ['hydro', 'comm', 'gas', 'municipal', 'pipeline', 'asbuilts']
+        for key in doc_keys:
+            fields[f'missing_{key}'] = self.missing_docs.get(key, False)
+        # 2-hour minimum (True if any technician has it)
+        fields['two_hr_min'] = bool(self.job.get_combined_totals().get('two_hr_min', False))
+        return fields
+    
+    def get_export_filename(self):
+        """Return the export filename: YYYY-MM-DD Client_Company Site_Address QJN."""
+        import re
+        date_str = format_date(self.site_visit_date, format='yyyy-MM-dd') if hasattr(self, 'site_visit_date') else ''
+        company = getattr(self, 'client_company', '') or ''
+        address = getattr(self, 'site_address', '') or ''
+        job_num = getattr(self, 'quadra_job_number', '') or ''
+        # Clean each part: replace newlines/tabs with spaces, strip extra whitespace
+        parts = [date_str, company.strip(), address.replace('\n', ' ').replace('\r', ' ').strip(), job_num.strip()]
+        filename = ' '.join(p for p in parts if p)
+        # Remove characters unsafe for filenames
+        filename = re.sub(r'[<>:"/\\|?*]', '', filename)
+        # Collapse multiple spaces
+        filename = re.sub(r'\s+', ' ', filename).strip()
+        return filename
 
 
 # Helper functions
