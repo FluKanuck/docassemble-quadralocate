@@ -2,8 +2,6 @@
 Custom Python objects for Quadra Utility Locate Report
 """
 from docassemble.base.util import DAObject, DAList, DADict, format_time, format_date
-from docassemble.base.functions import log
-import json
 from datetime import datetime, time
 
 
@@ -151,6 +149,9 @@ HOUR_LABELS = {
     'camera_inspection': 'Camera Inspection',
 }
 HOUR_TYPES_NUMERIC = [k for k in HOUR_TYPES if k != 'two_hr_min']
+REPORT_MAIN_COMBINED_MAX_CHARS = 2500
+REPORT_MAIN_BILLING_MAX_CHARS = 1100
+REPORT_CONT_PAGE_MAX_CHARS = 3400
 
 
 class HoursDict(dict):
@@ -221,12 +222,9 @@ class Technician(DAObject):
     def format_hours_line(self):
         """Format hours as 'EM = 2; GPR = 1.5; 2Hr Min = Yes; ...'."""
         parts = []
-        for hour_type in self.HOUR_TYPES:
+        for hour_type in HOUR_TYPES_NUMERIC:
             value = self.hours.get(hour_type)
-            if hour_type == 'two_hr_min':
-                if value:
-                    parts.append(f"{self.HOUR_LABELS.get(hour_type, hour_type)} = Yes")
-            elif value and float(value) > 0:
+            if value and float(value) > 0:
                 label = self.HOUR_LABELS.get(hour_type, hour_type)
                 parts.append(f"{label} = {format_number(float(value))}")
         return "; ".join(parts)
@@ -482,6 +480,14 @@ class Drawing(DAObject):
         if self.format == self.FORMAT_LARGE:
             return "Large Format (11x17)"
         return "Normal (Letter/A4)"
+
+    def has_content(self):
+        """Check if this drawing has an uploaded file."""
+        return bool(_extract_file(getattr(self, 'file', None)))
+
+    def get_file_for_preview(self):
+        """Return uploaded drawing file for preview display."""
+        return _extract_file(getattr(self, 'file', None))
     
     def get_drawing_fields(self, job_number=''):
         """Return dict mapping PDF form field names to values for this drawing."""
@@ -618,12 +624,13 @@ class LocateReport(DAObject):
         return "\r".join(lines)
     
     def format_supplemental(self):
-        """Format supplemental charges (9 items: Parking $ + 8 yes/no)."""
+        """Format supplemental charges with mixed boolean/hourly values."""
         items = []
-        supp_fields = [
-            ('parking', 'Parking'),
+        bool_fields = [
             ('traffic_control', 'Traffic control'),
             ('permitting', 'Permitting'),
+        ]
+        hourly_fields = [
             ('loa', 'LOA'),
             ('desktop', 'Desktop review'),
             ('cad', 'AutoCAD'),
@@ -631,10 +638,26 @@ class LocateReport(DAObject):
             ('vapour_probes', 'Vapour probes'),
             ('data_processing', 'Data processing'),
         ]
-        for key, label in supp_fields:
+
+        parking = getattr(self, 'supp_parking', None)
+        try:
+            if parking is not None and parking != '' and float(parking) > 0:
+                items.append(f"Parking = ${format_number(float(parking))}")
+        except (ValueError, TypeError):
+            pass
+
+        for key, label in bool_fields:
+            if bool(getattr(self, f'supp_{key}', False)):
+                items.append(label)
+
+        for key, label in hourly_fields:
             value = getattr(self, f'supp_{key}', None)
-            if value:
-                items.append(f"{label} = {value}")
+            try:
+                hours = float(value)
+            except (ValueError, TypeError):
+                continue
+            if hours > 0:
+                items.append(f"{label} = {format_number(hours)}")
         return "; ".join(items)
     
     def format_materials(self):
@@ -670,12 +693,7 @@ class LocateReport(DAObject):
     def format_combined_report(self):
         """Generate the complete combined report text."""
         sections = []
-        
-        # Summary of Work (user-entered overview, first in report)
-        work_summary = getattr(self, 'work_summary', '') or ''
-        if work_summary:
-            sections.append(f"SUMMARY OF WORK PERFORMED:\r{work_summary}")
-        
+
         # Travel Notes
         travel = getattr(self, 'travel_notes', '')
         if travel:
@@ -703,6 +721,46 @@ class LocateReport(DAObject):
             sections.append(reco_section)
         
         return "\r\r".join(sections)
+
+    def get_report_pagination(self):
+        """Split report text between main and continuation pages."""
+        combined_full = self.format_combined_report()
+        billing_full = self.format_billing_details()
+
+        main_combined, combined_overflow = split_text_at_limit(
+            combined_full, REPORT_MAIN_COMBINED_MAX_CHARS
+        )
+        main_billing, billing_overflow = split_text_at_limit(
+            billing_full, REPORT_MAIN_BILLING_MAX_CHARS
+        )
+
+        # Continuation content order requested by user:
+        # combined report overflow first, then billing overflow.
+        overflow_sections = []
+        if combined_overflow:
+            overflow_sections.append(combined_overflow)
+        if billing_overflow:
+            overflow_sections.append(billing_overflow)
+        overflow_text = "\r\r".join(overflow_sections)
+
+        return {
+            'main_combined': main_combined,
+            'main_billing': main_billing,
+            'cont_pages': split_into_pages(overflow_text, REPORT_CONT_PAGE_MAX_CHARS),
+        }
+
+    def get_report_cont_pages(self):
+        """Return continuation-page text chunks in render order."""
+        return self.get_report_pagination().get('cont_pages', [])
+
+    def get_report_cont_fields(self, page_index):
+        """Return fields for report continuation template."""
+        pages = self.get_report_cont_pages()
+        text = pages[page_index] if page_index < len(pages) else ''
+        return {
+            'quadra_job_number': getattr(self, 'quadra_job_number', ''),
+            'combined_report_cont': text,
+        }
     
     # ------------------------------------------------------------------
     # PDF template field-mapping methods (for fillable PDF export)
@@ -728,14 +786,14 @@ class LocateReport(DAObject):
         The client_signature field is intentionally excluded — it is a digital
         signature field in the PDF that the client signs on the exported document.
         """
-        combined = self.format_combined_report()
+        pagination = self.get_report_pagination()
         fields = {
             'quadra_job_number': getattr(self, 'quadra_job_number', ''),
             'bc1_call_number': self.format_bc1_display(),
             'weather': getattr(self, 'weather', '') or '',
-            'billing_details': self.format_billing_details(),
-            'combined_report': combined,
-            'summary_text': combined,  # PDF template may use either field name
+            'billing_details': pagination['main_billing'],
+            'combined_report': pagination['main_combined'],
+            'summary_text': (getattr(self, 'work_summary', '') or ''),
             'client_po_number': getattr(self, 'client_po_number', '') or '',
             'client_rep_name': getattr(self, 'client_rep_name', '') or '',
             'client_job_number': getattr(self, 'client_job_number', '') or '',
@@ -843,14 +901,55 @@ def format_totals_line(totals):
     """Format totals dict as 'EM = 3; GPR = 3.5; 2Hr Min = Yes; ...'."""
     parts = []
     labels = Technician.HOUR_LABELS
-    for key in Technician.HOUR_TYPES:
+    for key in HOUR_TYPES_NUMERIC:
         value = totals.get(key, 0)
-        if key == 'two_hr_min':
-            if value:
-                parts.append(f"{labels.get(key, key)} = Yes")
-        elif value and float(value) > 0:
+        if value and float(value) > 0:
             parts.append(f"{labels.get(key, key)} = {format_number(float(value))}")
     return "; ".join(parts)
+
+
+def normalize_pdf_text(text):
+    """Normalize line endings and trim whitespace for PDF field values."""
+    return (text or '').replace('\n', '\r').strip()
+
+
+def split_text_at_limit(text, max_chars):
+    """Split text near max_chars, preferring natural breakpoints."""
+    normalized = normalize_pdf_text(text)
+    if not normalized:
+        return '', ''
+    if len(normalized) <= max_chars:
+        return normalized, ''
+
+    min_split = int(max_chars * 0.6)
+    split_at = -1
+    for token in ['\r\r', '\r', '; ', ' ']:
+        idx = normalized.rfind(token, min_split, max_chars + 1)
+        if idx >= min_split:
+            split_at = idx + len(token)
+            break
+    if split_at < min_split:
+        split_at = max_chars
+
+    first = normalized[:split_at].rstrip()
+    remainder = normalized[split_at:].lstrip()
+    if not first:
+        first = normalized[:max_chars].rstrip()
+        remainder = normalized[max_chars:].lstrip()
+    return first, remainder
+
+
+def split_into_pages(text, max_chars):
+    """Split text into multiple continuation-page chunks."""
+    remaining = normalize_pdf_text(text)
+    pages = []
+    while remaining:
+        page_text, overflow = split_text_at_limit(remaining, max_chars)
+        if not page_text:
+            break
+        pages.append(page_text)
+        remaining = overflow
+    return pages
 
 
 def _extract_file(file_val):
@@ -882,21 +981,12 @@ def _to_pdf_file_value(file_val, field_name):
     """
     file_obj = _extract_file(file_val)
     if not file_obj:
-        # #region agent log
-        log(json.dumps({'location': 'objects.py:_to_pdf_file_value', 'message': 'empty file value', 'data': {'field': field_name}, 'hypothesisId': 'H-COVER-EMPTY'}))
-        # #endregion
         return None
     try:
         rendered = str(file_obj)
-    except Exception as err:
-        # #region agent log
-        log(json.dumps({'location': 'objects.py:_to_pdf_file_value', 'message': 'str(file_obj) failed', 'data': {'field': field_name, 'error': str(err), 'type': type(file_obj).__name__}, 'hypothesisId': 'H-COVER-STR-FAIL'}))
-        # #endregion
+    except Exception:
         return file_obj
     is_file_markup = isinstance(rendered, str) and rendered.startswith('[FILE ')
-    # #region agent log
-    log(json.dumps({'location': 'objects.py:_to_pdf_file_value', 'message': 'converted file value', 'data': {'field': field_name, 'type': type(file_obj).__name__, 'is_file_markup': is_file_markup, 'rendered_preview': rendered[:80] if isinstance(rendered, str) else str(type(rendered).__name__)}, 'hypothesisId': 'H-COVER-CONVERT'}))
-    # #endregion
     if is_file_markup:
         return rendered
     return file_obj

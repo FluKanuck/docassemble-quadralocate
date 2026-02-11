@@ -6,7 +6,7 @@ metadata:
   authors:
     - name: Quadra Utility Locating Ltd.
   revision_date: 2026-02-11
-  version: 1.5.17
+  version: 1.5.18
 ---
 modules:
   - docassemble.quadralocate.objects
@@ -92,7 +92,7 @@ question: |
 subquestion: |
   Welcome to the Quadra Utility Locate Report system.
   
-  <small class="text-muted">Version 1.5.17</small>
+  <small class="text-muted">Version 1.5.18</small>
 field: report_action
 buttons:
   - Start New Report: new
@@ -261,12 +261,7 @@ code: |
 ---
 # Build work_days and technicians from time_entries (for report/PDF)
 code: |
-  from docassemble.base.functions import log
-  import json
   from docassemble.quadralocate.objects import HOUR_TYPES, HoursDict
-  # #region agent log
-  log(json.dumps({'location': 'locate_report.yml:time_entries_built', 'message': 'rebuild start', 'data': {'time_entries_len': len(report.time_entries), 'work_days_gathered_before': report.job.work_days.has_been_gathered()}, 'hypothesisId': 'H-WORKDAYS-REBUILD'}))
-  # #endregion
   # Always rebuild from source-of-truth time entries when this block runs.
   report.job.work_days.clear()
   report.job.work_days.gathered = False
@@ -315,9 +310,6 @@ code: |
   report.job.work_days.gathered = True
   report.job.work_days.there_is_another = False
   report.job.is_multi_day = (len(report.job.work_days) > 1)
-  # #region agent log
-  log(json.dumps({'location': 'locate_report.yml:time_entries_built', 'message': 'rebuild end', 'data': {'dates_seen_len': len(dates_seen), 'work_days_len': len(report.job.work_days), 'is_multi_day': report.job.is_multi_day}, 'hypothesisId': 'H-WORKDAYS-REBUILD'}))
-  # #endregion
   time_entries_built = True
 ---
 # Satisfy lookup for work_days[i].technicians[j].hours.there_are_any (docassemble seeks a defining block).
@@ -350,23 +342,29 @@ fields:
     datatype: yesnoradio
     required: False
   - LOA: report.supp_loa
-    datatype: yesnoradio
+    datatype: number
     required: False
+    default: 0
   - Desktop Review: report.supp_desktop
-    datatype: yesnoradio
+    datatype: number
     required: False
+    default: 0
   - AutoCAD: report.supp_cad
-    datatype: yesnoradio
+    datatype: number
     required: False
+    default: 0
   - Concrete Coring: report.supp_coring
-    datatype: yesnoradio
+    datatype: number
     required: False
+    default: 0
   - Vapour Probes: report.supp_vapour_probes
-    datatype: yesnoradio
+    datatype: number
     required: False
+    default: 0
   - Data Processing: report.supp_data_processing
-    datatype: yesnoradio
+    datatype: number
     required: False
+    default: 0
 section: time_billing
 ---
 # ============================================
@@ -933,6 +931,13 @@ question: |
   Drawing ${ i + 1 } of ${ report.num_drawings }
 subquestion: |
   Upload drawing and select the page format.
+  % if report.drawings[i].has_content():
+
+  **Currently uploaded drawing** *(re-upload to replace, leave empty to keep)*:
+  % if report.drawings[i].get_file_for_preview():
+  ${ report.drawings[i].get_file_for_preview().show(width='120px') }${ ' — ' + report.drawings[i].title if report.drawings[i].title else '' }
+  % endif
+  % endif
 fields:
   - Drawing format: report.drawings[i].format
     datatype: radio
@@ -1101,6 +1106,46 @@ review:
   - Edit: report.num_drawings
     button: |
       **Drawings:** ${ report.num_drawings }
+  - Edit: report.drawings[0].file
+    button: |
+      **Drawing 1:** ${ report.drawings[0].title if defined('report.drawings[0].title') and report.drawings[0].title else 'Drawing 1' }${ ' — ' + report.drawings[0].get_format_label() if defined('report.drawings[0].format') else '' }
+    show if: report.num_drawings >= 1
+  - Edit: report.drawings[1].file
+    button: |
+      **Drawing 2:** ${ report.drawings[1].title if defined('report.drawings[1].title') and report.drawings[1].title else 'Drawing 2' }${ ' — ' + report.drawings[1].get_format_label() if defined('report.drawings[1].format') else '' }
+    show if: report.num_drawings >= 2
+  - Edit: report.drawings[2].file
+    button: |
+      **Drawing 3:** ${ report.drawings[2].title if defined('report.drawings[2].title') and report.drawings[2].title else 'Drawing 3' }${ ' — ' + report.drawings[2].get_format_label() if defined('report.drawings[2].format') else '' }
+    show if: report.num_drawings >= 3
+  - Edit: report.drawings[3].file
+    button: |
+      **Drawing 4:** ${ report.drawings[3].title if defined('report.drawings[3].title') and report.drawings[3].title else 'Drawing 4' }${ ' — ' + report.drawings[3].get_format_label() if defined('report.drawings[3].format') else '' }
+    show if: report.num_drawings >= 4
+  - Edit: report.drawings[4].file
+    button: |
+      **Drawing 5:** ${ report.drawings[4].title if defined('report.drawings[4].title') and report.drawings[4].title else 'Drawing 5' }${ ' — ' + report.drawings[4].get_format_label() if defined('report.drawings[4].format') else '' }
+    show if: report.num_drawings >= 5
+  - Edit: report.drawings[5].file
+    button: |
+      **Drawing 6:** ${ report.drawings[5].title if defined('report.drawings[5].title') and report.drawings[5].title else 'Drawing 6' }${ ' — ' + report.drawings[5].get_format_label() if defined('report.drawings[5].format') else '' }
+    show if: report.num_drawings >= 6
+  - Edit: report.drawings[6].file
+    button: |
+      **Drawing 7:** ${ report.drawings[6].title if defined('report.drawings[6].title') and report.drawings[6].title else 'Drawing 7' }${ ' — ' + report.drawings[6].get_format_label() if defined('report.drawings[6].format') else '' }
+    show if: report.num_drawings >= 7
+  - Edit: report.drawings[7].file
+    button: |
+      **Drawing 8:** ${ report.drawings[7].title if defined('report.drawings[7].title') and report.drawings[7].title else 'Drawing 8' }${ ' — ' + report.drawings[7].get_format_label() if defined('report.drawings[7].format') else '' }
+    show if: report.num_drawings >= 8
+  - Edit: report.drawings[8].file
+    button: |
+      **Drawing 9:** ${ report.drawings[8].title if defined('report.drawings[8].title') and report.drawings[8].title else 'Drawing 9' }${ ' — ' + report.drawings[8].get_format_label() if defined('report.drawings[8].format') else '' }
+    show if: report.num_drawings >= 9
+  - Edit: report.drawings[9].file
+    button: |
+      **Drawing 10:** ${ report.drawings[9].title if defined('report.drawings[9].title') and report.drawings[9].title else 'Drawing 10' }${ ' — ' + report.drawings[9].get_format_label() if defined('report.drawings[9].format') else '' }
+    show if: report.num_drawings >= 10
 continue button field: review_complete
 continue button label: Generate Report
 section: review
@@ -1253,6 +1298,14 @@ attachment:
   pdf template file: report_page.pdf
   code: report.get_report_fields()
 ---
+# Report continuation pages (indexed; added only when overflow exists)
+attachment:
+  variable name: report_cont_page_pdf[i]
+  name: Report Continuation ${ i + 1 }
+  filename: report_cont_${ i + 1 }
+  pdf template file: report_page_cont.pdf
+  code: report.get_report_cont_fields(i)
+---
 # Photo pages (indexed — one per photo page with content)
 attachment:
   variable name: report.photo_pages[i].filled_pdf
@@ -1285,6 +1338,10 @@ code: |
   from docassemble.base.util import pdf_concatenate, DAStaticFile
   
   parts = [cover_pdf.pdf, report_pdf.pdf]
+
+  # Report continuation pages (overflow from combined report, then billing details)
+  for idx in range(len(report.get_report_cont_pages())):
+    parts.append(report_cont_page_pdf[idx].pdf)
   
   # Photo pages — only include pages that have at least one photo
   for idx, page in enumerate(report.photo_pages):
@@ -1292,7 +1349,9 @@ code: |
       parts.append(page.filled_pdf.pdf)
   
   # Drawing pages — select letter or wide template based on format
-  for idx, drawing in enumerate(report.drawings):
+  # (bounded by user-selected count, so reduced counts do not export stale pages)
+  for idx in range(report.num_drawings if defined('report.num_drawings') else 0):
+    drawing = report.drawings[idx]
     if hasattr(drawing, 'file') and drawing.file:
       if drawing.is_large_format():
         parts.append(drawing.filled_pdf_wide.pdf)
@@ -1311,17 +1370,17 @@ code: |
 # Acceptable for current single-user usage; revisit if concurrent editing is needed.
 event: edit_report
 code: |
-  from docassemble.base.functions import log
-  import json
   report.revision_number += 1
-  # #region agent log
-  log(json.dumps({'location': 'locate_report.yml:edit_report', 'message': 'edit event start', 'data': {'time_entries_built_defined': defined('time_entries_built'), 'work_days_gathered_before': report.job.work_days.has_been_gathered()}, 'hypothesisId': 'H-EDIT-CLEAR'}))
-  # #endregion
   # ── Invalidate cached PDF attachments so they regenerate with updated data ──
   if defined('cover_pdf'):
     undefine('cover_pdf')
   if defined('report_pdf'):
     undefine('report_pdf')
+  # Indexed report continuation PDFs
+  for _idx in range(len(report.get_report_cont_pages())):
+    _attr = 'report_cont_page_pdf[' + str(_idx) + ']'
+    if defined(_attr):
+      undefine(_attr)
   # Indexed photo page PDFs
   for _idx in range(len(report.photo_pages)):
     _attr = 'report.photo_pages[' + str(_idx) + '].filled_pdf'
@@ -1340,9 +1399,6 @@ code: |
     report.job.work_days.clear()
     report.job.work_days.gathered = False
     report.job.work_days.there_are_any = False
-  # #region agent log
-  log(json.dumps({'location': 'locate_report.yml:edit_report', 'message': 'edit event post-clear', 'data': {'time_entries_built_defined_after': defined('time_entries_built'), 'work_days_gathered_after': report.job.work_days.has_been_gathered()}, 'hypothesisId': 'H-EDIT-CLEAR'}))
-  # #endregion
   # ── Re-show review screen ──
   review_complete = False
   force_ask('review_complete')

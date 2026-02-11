@@ -784,10 +784,10 @@ See `docs/PHOTO_PDF_TEMPLATE.md` for step-by-step template update instructions.
 | Detail | Value |
 |--------|-------|
 | **Date opened** | 2026-02-11 |
-| **Date resolved** | *unresolved* |
-| **Status** | **TRIED** |
+| **Date resolved** | 2026-02-11 |
+| **Status** | **RESOLVED** |
 | **Version** | 1.5.15 |
-| **Commits** | *(pending)* |
+| **Commits** | `199a93f` |
 
 **Symptom:** Generating the report raises: *"reference to variable `report.cover_photo[0]._get_unqualified_reference` could not be looked up"*.
 
@@ -798,7 +798,7 @@ See `docs/PHOTO_PDF_TEMPLATE.md` for step-by-step template update instructions.
    - falls back to returning the DAFile object.
 2. Added runtime logs (via `log(json.dumps(...))`) in `_to_pdf_file_value()` to capture conversion behavior for `cover_photo`, `photo_n`, and `drawing_image`.
 
-**What worked:** *Pending verification run.*
+**What worked:** Replaced direct `_get_unqualified_reference()` calls with `_to_pdf_file_value()`, which safely converts uploads using `str(DAFile)` (`[FILE ...]`) and falls back gracefully. User confirmed cover image issue was resolved after correcting field naming on the template.
 
 ---
 
@@ -807,10 +807,10 @@ See `docs/PHOTO_PDF_TEMPLATE.md` for step-by-step template update instructions.
 | Detail | Value |
 |--------|-------|
 | **Date opened** | 2026-02-11 |
-| **Date resolved** | *unresolved* |
-| **Status** | **TRIED** |
+| **Date resolved** | 2026-02-11 |
+| **Status** | **RESOLVED** |
 | **Version** | 1.5.14 |
-| **Commits** | *(pending)* |
+| **Commits** | `9365fc0` |
 
 **Symptom:** After clicking **Edit This Report** and then generating again, interview crashes with: *"reference to variable `report.job.work_days[0].date` could not be looked up."*
 
@@ -819,7 +819,29 @@ See `docs/PHOTO_PDF_TEMPLATE.md` for step-by-step template update instructions.
 2. Added guard state during edit clear (`work_days.there_are_any = False`) to prevent Docassemble gather from trying to resolve item `[0].date` while list is empty/ungathered.
 3. Added runtime logs in both `edit_report` and `time_entries_built` to capture pre/post gather state and rebuild counts.
 
-**What worked:** *Pending verification run.*
+**What worked:** Rebuild now always reconstructs `report.job.work_days` deterministically from `report.time_entries`, with safe list state (`there_are_any`/`gathered`) during edit/regenerate transitions. User confirmed the issue is fixed.
+
+---
+
+### ISS-040 — Report propagation controls, continuation overflow pages, drawing edit parity, and supplemental hourly entries
+
+| Detail | Value |
+|--------|-------|
+| **Date opened** | 2026-02-11 |
+| **Date resolved** | 2026-02-11 |
+| **Status** | **RESOLVED** |
+| **Version** | 1.5.18 |
+| **Commits** | *(pending commit)* |
+
+**Symptom:** Multiple report-output mismatches and edit UX gaps were identified in one pass: (1) 2Hr Min appeared both in checkbox and billing text, (2) Summary of Work propagated to both combined report and summary text with an unwanted header, (3) Travel Notes propagated in both places instead of combined report only, (4) no continuation-page handling for report overflow despite `report_page_cont.pdf` existing, (5) billing overflow had nowhere to go, (6) drawing edit flow only allowed changing count with no existing-file visibility, and (7) several supplemental charge items were yes/no but should be numeric hourly entries.
+
+**What we tried:**
+1. Traced all propagation and export wiring through `LocateReport.get_report_fields()`, `format_combined_report()`, `format_billing_details()`, attachment blocks, and `download_report` assembly order to keep ISS-021/025/030/039 behavior intact.
+2. Added bounded text pagination heuristics (main-page + continuation chunks) and continuation attachment wiring with ordered overflow placement.
+3. Mirrored the photo-page edit pattern for drawings (preview helpers + review Edit targets) while keeping drawing export bounded by `num_drawings`.
+4. Converted selected supplemental fields to numeric inputs and updated formatter logic to support mixed boolean + numeric output cleanly.
+
+**What worked:** Implemented all requested behavior updates together in v1.5.18: `summary_text` now maps only raw work summary text, `combined_report` excludes summary and includes Travel Notes only when present, 2Hr Min remains checkbox-only (removed from billing text lines), overflow content now generates one-or-more `report_page_cont.pdf` pages via `combined_report_cont` (combined overflow first, billing overflow second), drawing edits now support per-drawing edit and current-upload preview from review, and LOA/Desktop/AutoCAD/Concrete Coring/Vapour Probes/Data Processing now collect numeric hourly values while Traffic Control/Permitting remain yes/no.
 
 ---
 
