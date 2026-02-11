@@ -60,7 +60,7 @@ question: |
 subquestion: |
   Welcome to the Quadra Utility Locate Report system.
   
-  <small class="text-muted">Version 1.5.1</small>
+  <small class="text-muted">Version 1.5.2</small>
 field: report_action
 buttons:
   - Start New Report: new
