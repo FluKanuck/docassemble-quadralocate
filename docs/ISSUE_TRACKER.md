@@ -645,6 +645,28 @@ This ensures every "Download PDF Report" after an edit cycle produces a fresh PD
 
 ---
 
+### ISS-032 — "Add another" frozen + time picker allows arbitrary minutes (ISS-031 regression)
+
+| Detail | Value |
+|--------|-------|
+| **Date opened** | 2026-02-11 |
+| **Date resolved** | 2026-02-11 |
+| **Status** | **RESOLVED** |
+| **Version** | 1.5.5 → 1.5.6 |
+| **Commits** | *(included in 1.5.6 commit)* |
+
+**Symptom:** Two problems introduced by the v1.5.5 time-picker script: (1) The "Add another" button in the list-collect table stopped responding — all page JavaScript was frozen. (2) The native time picker still allowed users to type any minute value (e.g., 8:07) even with `step="900"`.
+
+**What we tried:** N/A — root causes identified on first analysis.
+
+**What worked:** Two fixes in the `script` block:
+1. **Infinite MutationObserver loop:** The old `setTimeStep()` unconditionally called `$.attr('step', '900')` on every time input, which mutated the DOM, which re-triggered the observer, ad infinitum — freezing all JS. Fixed by tagging each input with `$el.data('time-init', true)` on first visit and skipping already-initialized inputs. Added a `_busy` flag + `setTimeout(50ms)` debounce on the observer callback so the observer never re-fires while `initTimeInputs()` is running.
+2. **Manual entry not restricted:** HTML5 `step` only affects spinner arrows, not typed values. Added a `change` event handler that snaps the entered time to the nearest 15-minute mark: `Math.round(m / 15) * 15`, with rollover handling for m=60.
+
+**Lesson learned:** MutationObserver + unconditional DOM writes = infinite loop. Always guard against re-entry. HTML5 `step` is a UI hint, not a constraint — client-side `change` handlers are needed to enforce rounding.
+
+---
+
 <!-- 
   ┌──────────────────────────────────────────────────────────────────┐
   │  TEMPLATE — Copy this block when adding a new issue.            │

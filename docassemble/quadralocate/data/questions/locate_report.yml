@@ -6,7 +6,7 @@ metadata:
   authors:
     - name: Quadra Utility Locating Ltd.
   revision_date: 2026-02-11
-  version: 1.5.5
+  version: 1.5.6
 ---
 modules:
   - docassemble.quadralocate.objects
@@ -60,7 +60,7 @@ question: |
 subquestion: |
   Welcome to the Quadra Utility Locate Report system.
   
-  <small class="text-muted">Version 1.5.5</small>
+  <small class="text-muted">Version 1.5.6</small>
 field: report_action
 buttons:
   - Start New Report: new
@@ -159,15 +159,37 @@ fields:
     datatype: time
 script: |
   <script>
-    // Restrict time inputs to 15-minute increments (step = 900 seconds).
-    // Uses MutationObserver to also catch rows added dynamically by list collect.
-    function setTimeStep() {
-      $('input[type="time"]').attr('step', '900');
+    // Restrict time inputs to 15-minute increments.
+    // 1. step="900" makes the spinner arrows jump in 15-min steps.
+    // 2. The "change" handler snaps manually-typed times to the nearest 15 min.
+    // 3. A guarded MutationObserver re-applies to rows added by list collect
+    //    without causing an infinite loop.
+    function initTimeInputs() {
+      $('input[type="time"]').each(function() {
+        var $el = $(this);
+        if ($el.data('time-init')) return;   // already wired — skip
+        $el.data('time-init', true);
+        $el.attr('step', '900');
+        $el.on('change', function() {
+          var v = this.value;                // "HH:MM"
+          if (!v) return;
+          var p = v.split(':');
+          var h = parseInt(p[0], 10);
+          var m = parseInt(p[1], 10);
+          m = Math.round(m / 15) * 15;
+          if (m === 60) { m = 0; h = (h + 1) % 24; }
+          this.value = ('0' + h).slice(-2) + ':' + ('0' + m).slice(-2);
+        });
+      });
     }
-    setTimeStep();
-    var observer = new MutationObserver(function() { setTimeStep(); });
-    observer.observe(document.querySelector('form') || document.body,
-                     { childList: true, subtree: true });
+    initTimeInputs();
+    var _busy = false;
+    new MutationObserver(function() {
+      if (_busy) return;
+      _busy = true;
+      setTimeout(function() { initTimeInputs(); _busy = false; }, 50);
+    }).observe(document.querySelector('form') || document.body,
+               { childList: true, subtree: true });
   </script>
 section: time_billing
 ---
