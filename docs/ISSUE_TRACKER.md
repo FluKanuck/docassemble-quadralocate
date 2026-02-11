@@ -537,6 +537,30 @@ All previous fixes (ISS-012 through ISS-015) verified intact.
 
 ---
 
+### ISS-027 — Time fields: 15-minute increment dropdowns + hour breakdown title with times
+
+| Detail | Value |
+|--------|-------|
+| **Date opened** | 2026-02-11 |
+| **Date resolved** | 2026-02-11 |
+| **Status** | **RESOLVED** |
+| **Version** | 1.5.0 |
+| **Commits** | *(included in 1.5.0 commit)* |
+
+**Symptom:** Time on Site start/end fields used a free-form HTML5 time picker, allowing arbitrary minute values. The hour breakdown question title did not show the technician's start/end times, making it harder to orient when entering hours.
+
+**What we tried:** N/A — feature enhancement, implemented in a single pass.
+
+**What worked:** Three changes:
+1. Added `time_15min_choices()` helper function in `objects.py` that generates 96 dropdown options (every 15 min from 12:00 AM to 11:45 PM) with 24-hour `HH:MM` stored values for compatibility with existing `format_time_12hr()`.
+2. Replaced `datatype: time` on Start Time / End Time in the "Time on Site" `list collect` question with `choices: code: time_15min_choices()`, restricting input to 15-minute increments.
+3. Added `format_time_range_12hr()` method on `TimeEntry` and updated the hour breakdown question title to include the time range (e.g., "Hour breakdown — 2/12/26 — Adam Cappon — 8:00 am - 2:00 pm").
+4. Exported `time_15min_choices` and `format_time_12hr` in `__all__` so they are available in the YAML interview context.
+
+No existing fixes affected — time storage format (`HH:MM` strings) unchanged; all downstream consumers (`format_time_12hr`, `WorkDay.format_time_range`, build code) handle strings identically.
+
+---
+
 <!-- 
   ┌──────────────────────────────────────────────────────────────────┐
   │  TEMPLATE — Copy this block when adding a new issue.            │

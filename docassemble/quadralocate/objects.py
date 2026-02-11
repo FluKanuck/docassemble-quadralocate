@@ -17,6 +17,8 @@ __all__ = [
     'Drawing',
     'LocateReport',
     'HoursDict',
+    'time_15min_choices',
+    'format_time_12hr',
 ]
 
 
@@ -169,6 +171,18 @@ class TimeEntry(DAObject):
             self.hours = HoursDict()
             for hour_type in HOUR_TYPES:
                 self.hours[hour_type] = 0 if hour_type != 'two_hr_min' else False
+    
+    def format_time_range_12hr(self):
+        """Format start/end times as '8:00 AM - 2:00 PM' for display in titles."""
+        start = format_time_12hr(getattr(self, 'start_time', None))
+        end = format_time_12hr(getattr(self, 'end_time', None))
+        if start and end:
+            return f"{start} - {end}"
+        elif start:
+            return f"from {start}"
+        elif end:
+            return f"to {end}"
+        return ""
 
 
 class Technician(DAObject):
@@ -846,3 +860,31 @@ def make_continuation_line(content):
     if not content:
         return ""
     return " " * HEADER_WIDTH + content
+
+
+def time_15min_choices():
+    """Generate time choices in 15-minute increments for dropdown fields.
+
+    Returns a list of dicts [{display_label: stored_value}, ...] suitable for
+    Docassemble ``choices:`` on a field.  Stored values use 24-hour ``HH:MM``
+    format (compatible with the existing ``format_time_12hr`` helper).
+    """
+    choices = []
+    for hour in range(24):
+        for minute in (0, 15, 30, 45):
+            value = f"{hour:02d}:{minute:02d}"
+            if hour == 0:
+                display_hour = 12
+                ampm = 'AM'
+            elif hour < 12:
+                display_hour = hour
+                ampm = 'AM'
+            elif hour == 12:
+                display_hour = 12
+                ampm = 'PM'
+            else:
+                display_hour = hour - 12
+                ampm = 'PM'
+            display = f"{display_hour}:{minute:02d} {ampm}"
+            choices.append({display: value})
+    return choices
