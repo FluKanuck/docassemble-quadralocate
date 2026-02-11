@@ -6,7 +6,7 @@ metadata:
   authors:
     - name: Quadra Utility Locating Ltd.
   revision_date: 2026-02-11
-  version: 1.5.7
+  version: 1.5.8
 ---
 modules:
   - docassemble.quadralocate.objects
@@ -30,6 +30,34 @@ features:
   navigation: True
   progress bar: True
   question back button: True
+---
+script: |
+  <script>
+    // Restrict time inputs to 15-minute increments (for Time on Site fields).
+    // Uses jQuery event delegation so it works for dynamically added rows (list collect)
+    // without interfering with Docassemble's list-collection JavaScript.
+    $(document).ready(function() {
+      // Set step on existing inputs (spinner arrows jump in 15-min steps).
+      $('input[type="time"]').attr('step', '900');
+
+      // Set step on new inputs when they receive focus (covers list-collect rows).
+      $(document).on('focus', 'input[type="time"]', function() {
+        if (!$(this).attr('step')) $(this).attr('step', '900');
+      });
+
+      // Snap manually-typed times to nearest 15 min on change (delegated).
+      $(document).on('change', 'input[type="time"]', function() {
+        var v = this.value;
+        if (!v) return;
+        var p = v.split(':');
+        var h = parseInt(p[0], 10);
+        var m = parseInt(p[1], 10);
+        m = Math.round(m / 15) * 15;
+        if (m === 60) { m = 0; h = (h + 1) % 24; }
+        this.value = ('0' + h).slice(-2) + ':' + ('0' + m).slice(-2);
+      });
+    });
+  </script>
 ---
 sections:
   - introduction: Introduction
@@ -60,7 +88,7 @@ question: |
 subquestion: |
   Welcome to the Quadra Utility Locate Report system.
   
-  <small class="text-muted">Version 1.5.7</small>
+  <small class="text-muted">Version 1.5.8</small>
 field: report_action
 buttons:
   - Start New Report: new
@@ -157,32 +185,6 @@ fields:
     datatype: time
   - End Time: report.time_entries[i].end_time
     datatype: time
-script: |
-  <script>
-    // Restrict time inputs to 15-minute increments.
-    // Uses event delegation so it works for dynamically added rows (list collect)
-    // without any MutationObserver — no risk of interfering with Docassemble JS.
-
-    // Set step on existing inputs (spinner arrows jump in 15-min steps).
-    $('input[type="time"]').attr('step', '900');
-
-    // Set step on new inputs when they receive focus (covers list-collect rows).
-    $(document).on('focus', 'input[type="time"]', function() {
-      if (!$(this).attr('step')) $(this).attr('step', '900');
-    });
-
-    // Snap manually-typed times to nearest 15 min on change (delegated).
-    $(document).on('change', 'input[type="time"]', function() {
-      var v = this.value;
-      if (!v) return;
-      var p = v.split(':');
-      var h = parseInt(p[0], 10);
-      var m = parseInt(p[1], 10);
-      m = Math.round(m / 15) * 15;
-      if (m === 60) { m = 0; h = (h + 1) % 24; }
-      this.value = ('0' + h).slice(-2) + ':' + ('0' + m).slice(-2);
-    });
-  </script>
 section: time_billing
 ---
 question: |

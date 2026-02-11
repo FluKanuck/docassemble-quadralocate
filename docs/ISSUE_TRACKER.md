@@ -693,6 +693,28 @@ This approach does zero DOM observation and zero DOM writes on mutation events, 
 
 ---
 
+### ISS-034 — "Add another" broken since v1.5.5: script block inside list collect question
+
+| Detail | Value |
+|--------|-------|
+| **Date opened** | 2026-02-11 |
+| **Date resolved** | 2026-02-11 |
+| **Status** | **RESOLVED** |
+| **Version** | 1.5.5 → 1.5.8 |
+| **Commits** | *(included in 1.5.8 commit)* |
+
+**Symptom:** The "Add another" button in the "Time on Site" list collect question stopped responding after switching from the dropdown (`choices: code: time_15min_choices()`) to the native time picker (`datatype: time`) in v1.5.5. The button remained broken through all subsequent JavaScript fixes (v1.5.6, v1.5.7). Git history review revealed the `script:` block was present from v1.5.5 onward, meaning "Add another" was likely broken from the start, not by the specific JavaScript code changes.
+
+**What we tried:**
+1. ISS-032: Added debounce/guard to MutationObserver — did not fix "Add another".
+2. ISS-033: Removed MutationObserver entirely, used jQuery event delegation — did not fix "Add another".
+
+**What worked:** **Moved the `script:` block out of the list collect question entirely.** Embedding a `script:` modifier inside a `list collect: True` question block appears to interfere with Docassemble's list-collection rendering/JavaScript. Placed the script as a **top-level block** (right after the `features:` section) so it runs globally on every page without being tied to any specific question. Wrapped the code in `$(document).ready())` to ensure it runs after Docassemble's own page setup completes. The time-picker JavaScript (event delegation for step/snap) is unchanged; only its placement in the YAML file changed.
+
+**Lesson learned:** Do not embed `script:` blocks inside `list collect` questions — they break Docassemble's list-collection machinery. Use top-level `script:` blocks for global JavaScript that needs to work across all questions, including dynamically rendered list-collect rows.
+
+---
+
 <!-- 
   ┌──────────────────────────────────────────────────────────────────┐
   │  TEMPLATE — Copy this block when adding a new issue.            │
