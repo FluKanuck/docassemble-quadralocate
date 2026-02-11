@@ -6,7 +6,7 @@ metadata:
   authors:
     - name: Quadra Utility Locating Ltd.
   revision_date: 2026-02-11
-  version: 1.5.1
+  version: 1.5.3
 ---
 modules:
   - docassemble.quadralocate.objects
@@ -803,6 +803,13 @@ question: |
 subquestion: |
   Upload up to 6 photos for this page. Each photo can have an optional caption.
   Leave slots empty if not needed.
+  % if report.photo_pages[i].has_content():
+
+  **Currently uploaded photos** *(re-upload to replace, leave empty to keep)*:
+  % for slot_num, photo, comment in report.photo_pages[i].get_photos_with_comments():
+  Photo ${ slot_num }: ${ photo.show(width='120px') }${ ' — ' + comment if comment else '' }
+  % endfor
+  % endif
 fields:
   - note: |
       **Photo 1**
@@ -1261,6 +1268,29 @@ code: |
 event: edit_report
 code: |
   report.revision_number += 1
+  # ── Invalidate cached PDF attachments so they regenerate with updated data ──
+  if defined('cover_pdf'):
+    undefine('cover_pdf')
+  if defined('report_pdf'):
+    undefine('report_pdf')
+  # Indexed photo page PDFs
+  for _idx in range(len(report.photo_pages)):
+    _attr = 'report.photo_pages[' + str(_idx) + '].filled_pdf'
+    if defined(_attr):
+      undefine(_attr)
+  # Indexed drawing PDFs
+  if defined('report.num_drawings'):
+    for _idx in range(report.num_drawings):
+      for _suffix in ['filled_pdf_letter', 'filled_pdf_wide']:
+        _attr = 'report.drawings[' + str(_idx) + '].' + _suffix
+        if defined(_attr):
+          undefine(_attr)
+  # ── Force rebuild of work_days from (possibly edited) time entries ──
+  if defined('time_entries_built'):
+    undefine('time_entries_built')
+    report.job.work_days.clear()
+    report.job.work_days.gathered = False
+  # ── Re-show review screen ──
   review_complete = False
   force_ask('review_complete')
 ---

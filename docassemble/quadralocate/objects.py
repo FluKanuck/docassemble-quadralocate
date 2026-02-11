@@ -426,11 +426,11 @@ class PhotoPage(DAObject):
         # they must remain undefined so Docassemble shows the question.
     
     def get_photos_with_comments(self):
-        """Yield (photo, comment) for each slot that has an uploaded photo."""
+        """Yield (slot_number, photo, comment) for each slot that has an uploaded photo."""
         for n in self.SLOTS:
             photo = getattr(self, f'photo_{n}', None)
             if photo:
-                yield photo, getattr(self, f'comment_{n}', '') or ''
+                yield n, photo, getattr(self, f'comment_{n}', '') or ''
     
     def has_content(self):
         """Check if any slot has an uploaded photo."""
@@ -441,13 +441,18 @@ class PhotoPage(DAObject):
         return sum(1 for _ in self.get_photos_with_comments())
     
     def get_photo_fields(self, page_index, job_number=''):
-        """Return dict mapping PDF form field names to values for this photo page."""
+        """Return dict mapping PDF form field names to values for this photo page.
+        
+        Uses _extract_file() to convert DAFileList → single DAFile for PDF
+        image fields (pushbutton with 'Icon only' layout).
+        """
         fields = {
             'quadra_job_number': str(job_number),
             'page_label': f'Photo Page {page_index + 1}',
         }
         for n in self.SLOTS:
-            photo = getattr(self, f'photo_{n}', None)
+            raw = getattr(self, f'photo_{n}', None)
+            photo = _extract_file(raw)
             if photo:
                 fields[f'photo_{n}'] = photo
             caption = getattr(self, f'comment_{n}', '') or ''
@@ -482,7 +487,7 @@ class Drawing(DAObject):
             'quadra_job_number': str(job_number),
             'drawing_title': getattr(self, 'title', '') or '',
         }
-        drawing_file = getattr(self, 'file', None)
+        drawing_file = _extract_file(getattr(self, 'file', None))
         if drawing_file:
             fields['drawing_image'] = drawing_file
         return fields
@@ -710,7 +715,7 @@ class LocateReport(DAObject):
             'site_visit_date': format_date(self.site_visit_date) if hasattr(self, 'site_visit_date') else '',
             'site_address': getattr(self, 'site_address', ''),
         }
-        cover = getattr(self, 'cover_photo', None)
+        cover = _extract_file(getattr(self, 'cover_photo', None))
         if cover:
             fields['cover_photo'] = cover
         return fields
@@ -841,6 +846,27 @@ def format_totals_line(totals):
         elif value and float(value) > 0:
             parts.append(f"{labels.get(key, key)} = {format_number(float(value))}")
     return "; ".join(parts)
+
+
+def _extract_file(file_val):
+    """Extract a single DAFile from a DAFileList for PDF template image fields.
+
+    Docassemble's ``datatype: file`` stores uploads as DAFileList.  PDF template
+    image fields (pushbutton with 'Icon only' layout) need a single DAFile
+    object.  This helper handles both DAFileList (returns first item) and plain
+    DAFile (returns as-is).  Returns None if no valid file is found.
+    """
+    if file_val is None:
+        return None
+    # DAFileList or list-like → extract first item
+    if hasattr(file_val, '__getitem__') and hasattr(file_val, '__len__'):
+        try:
+            if len(file_val) > 0:
+                return file_val[0]
+        except Exception:
+            pass
+        return None
+    return file_val
 
 
 HEADER_WIDTH = 18

@@ -415,17 +415,18 @@ All previous fixes (ISS-012 through ISS-015) verified intact.
 | Detail | Value |
 |--------|-------|
 | **Date opened** | 2026-02-11 |
-| **Date resolved** | *unresolved (code side verified)* |
-| **Status** | **OPEN** |
-| **Version** | 1.4.0 |
-| **Commits** | *(included in 1.4.0 commit)* |
+| **Date resolved** | 2026-02-11 |
+| **Status** | **RESOLVED** |
+| **Version** | 1.4.0 → 1.5.3 |
+| **Commits** | *(included in 1.5.3 commit)* |
 
 **Symptom:** Photo pages in the exported PDF are blank — no images visible despite photos being uploaded during the interview.
 
 **What we tried:**
-1. Verified the code path: `get_photo_fields()` correctly passes DAFile objects for `photo_1`–`photo_6` fields. The `pdf_concatenate()` assembly includes photo pages with `has_content()` checks. Code logic is correct.
+1. Verified the code path: `get_photo_fields()` correctly passes DAFile objects for `photo_1`–`photo_6` fields. The `pdf_concatenate()` assembly includes photo pages with `has_content()` checks. Code logic appeared correct.
+2. Initially suspected the `photo_page.pdf` template's form fields were standard text fields instead of image-capable fields (pushbutton with "Icon only" layout). User confirmed template fields are set up correctly.
 
-**What worked:** Pending — the most likely cause is the `photo_page.pdf` template's form fields are standard text fields instead of image-capable fields (pushbutton with "Icon only" layout). The template needs to be inspected and rebuilt in Acrobat Pro. Compare field types with `cover_page.pdf` if cover photo works.
+**What worked:** The root cause was that `datatype: file` in Docassemble stores uploads as `DAFileList` (a list of files), not a single `DAFile`. PDF template image fields need a single `DAFile` object. The `get_photo_fields()` method was passing the raw `DAFileList` — the PDF filler couldn't extract the image. Added `_extract_file()` helper that converts `DAFileList → DAFile[0]`. Applied the same fix to `get_cover_fields()` (cover photo) and `get_drawing_fields()` (drawing images).
 
 ---
 
@@ -576,6 +577,50 @@ No existing fixes affected — time storage format (`HH:MM` strings) unchanged; 
 **What we tried:** N/A — root cause was clear (missing review entries).
 
 **What worked:** Added 7 conditional `Edit:` entries in the review block's "Locate Details" section — one for each utility that has a `.summary` question (Electrical, Communications, Gas/Pipeline, Water, Storm, Sanitary, Unknown/Other). Each entry uses `show if: defined('report.utilities.<key>.summary')` so it only appears when that utility's summary was actually gathered (i.e., the utility has methods selected and is not out of scope). Clicking Edit navigates directly to the corresponding utility details question.
+
+---
+
+### ISS-029 — Photo inputs blank when re-editing from review screen
+
+| Detail | Value |
+|--------|-------|
+| **Date opened** | 2026-02-11 |
+| **Date resolved** | 2026-02-11 |
+| **Status** | **RESOLVED** |
+| **Version** | 1.5.3 |
+| **Commits** | *(included in 1.5.3 commit)* |
+
+**Symptom:** When clicking Edit on the Photo Pages entry in the review screen, the photo file upload fields appeared blank — previously uploaded photos were not visible. Users had no way to see what was already uploaded.
+
+**What we tried:** N/A — root cause identified on first analysis.
+
+**What worked:** Two changes:
+1. Updated `get_photos_with_comments()` to yield `(slot_number, photo, comment)` 3-tuples (previously 2-tuples) so the slot number is available for display.
+2. Added conditional subquestion text on the photo page question that shows thumbnails of all currently uploaded photos (using `photo.show(width='120px')`) when `has_content()` is True. On first visit (no uploads yet), the extra text is hidden. On re-edit, users see their existing photos with captions and a note that they can re-upload to replace or leave empty to keep.
+
+**Note:** HTML file inputs cannot be pre-populated (browser security restriction). Docassemble may or may not show a "file already uploaded" indicator depending on version. The subquestion thumbnails provide a reliable fallback regardless.
+
+---
+
+### ISS-030 — Report not regenerating after edits (stale PDF cache)
+
+| Detail | Value |
+|--------|-------|
+| **Date opened** | 2026-02-11 |
+| **Date resolved** | 2026-02-11 |
+| **Status** | **RESOLVED** |
+| **Version** | 1.5.3 |
+| **Commits** | *(included in 1.5.3 commit)* |
+
+**Symptom:** After clicking "Edit This Report" on the final screen, making edits (e.g., changing utility detail/summary text), and clicking "Generate Report" again, the downloaded PDF still contained the old text. Edits were not propagating to the exported PDF.
+
+**What we tried:** N/A — root cause was clear.
+
+**What worked:** The root cause was that Docassemble's `attachment` blocks with `variable name` cache the generated PDF. Once `cover_pdf`, `report_pdf`, `report.photo_pages[i].filled_pdf`, etc. were computed, they were never recomputed — even after edits. Updated the `edit_report` event to:
+1. `undefine()` all cached attachment variables (`cover_pdf`, `report_pdf`, indexed photo page and drawing PDFs) so Docassemble recomputes them from the attachment blocks on next download.
+2. `undefine('time_entries_built')` and `report.job.work_days.clear()` + `gathered = False` to force rebuild of the work_days structure from (possibly edited) time entries.
+
+This ensures every "Download PDF Report" after an edit cycle produces a fresh PDF reflecting all changes.
 
 ---
 
