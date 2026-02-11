@@ -786,7 +786,7 @@ See `docs/PHOTO_PDF_TEMPLATE.md` for step-by-step template update instructions.
 | **Date opened** | 2026-02-11 |
 | **Date resolved** | *unresolved* |
 | **Status** | **TRIED** |
-| **Version** | 1.5.14 |
+| **Version** | 1.5.15 |
 | **Commits** | *(pending)* |
 
 **Symptom:** Generating the report raises: *"reference to variable `report.cover_photo[0]._get_unqualified_reference` could not be looked up"*.
@@ -797,6 +797,27 @@ See `docs/PHOTO_PDF_TEMPLATE.md` for step-by-step template update instructions.
    - prefers `str(DAFile)` (Docassemble `[FILE ...]` markup),
    - falls back to returning the DAFile object.
 2. Added runtime logs (via `log(json.dumps(...))`) in `_to_pdf_file_value()` to capture conversion behavior for `cover_photo`, `photo_n`, and `drawing_image`.
+
+**What worked:** *Pending verification run.*
+
+---
+
+### ISS-039 — Edit/regenerate crash: `report.job.work_days[0].date` lookup
+
+| Detail | Value |
+|--------|-------|
+| **Date opened** | 2026-02-11 |
+| **Date resolved** | *unresolved* |
+| **Status** | **TRIED** |
+| **Version** | 1.5.14 |
+| **Commits** | *(pending)* |
+
+**Symptom:** After clicking **Edit This Report** and then generating again, interview crashes with: *"reference to variable `report.job.work_days[0].date` could not be looked up."*
+
+**What we tried:**
+1. Made `time_entries_built` rebuild deterministic: always clear and rebuild `report.job.work_days` from `report.time_entries` when the block runs.
+2. Added guard state during edit clear (`work_days.there_are_any = False`) to prevent Docassemble gather from trying to resolve item `[0].date` while list is empty/ungathered.
+3. Added runtime logs in both `edit_report` and `time_entries_built` to capture pre/post gather state and rebuild counts.
 
 **What worked:** *Pending verification run.*
 

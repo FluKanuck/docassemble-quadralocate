@@ -6,7 +6,7 @@ metadata:
   authors:
     - name: Quadra Utility Locating Ltd.
   revision_date: 2026-02-11
-  version: 1.5.14
+  version: 1.5.15
 ---
 modules:
   - docassemble.quadralocate.objects
@@ -92,7 +92,7 @@ question: |
 subquestion: |
   Welcome to the Quadra Utility Locate Report system.
   
-  <small class="text-muted">Version 1.5.14</small>
+  <small class="text-muted">Version 1.5.15</small>
 field: report_action
 buttons:
   - Start New Report: new
@@ -261,49 +261,63 @@ code: |
 ---
 # Build work_days and technicians from time_entries (for report/PDF)
 code: |
-  if not report.job.work_days.has_been_gathered():
-    from docassemble.quadralocate.objects import HOUR_TYPES, HoursDict
-    dates_seen = []
-    for entry in report.time_entries:
-      d = entry.date
-      if d not in dates_seen:
-        dates_seen.append(d)
-    for d in dates_seen:
-      day = report.job.work_days.appendObject()
-      day.date = d
-      day_entries = [e for e in report.time_entries if e.date == d]
-      if day_entries:
-        starts = [e.start_time for e in day_entries if e.start_time]
-        ends = [e.end_time for e in day_entries if e.end_time]
-        if starts:
-          day.start_time = min(starts)
-        if ends:
-          day.end_time = max(ends)
-      day.weather = report.weather
-      tech_names = []
-      for e in day_entries:
-        if e.technician_name and e.technician_name not in tech_names:
-          tech_names.append(e.technician_name)
-      for name in tech_names:
-        tech_entries = [e for e in day_entries if e.technician_name == name]
-        hours_vals = {}
-        for ht in HOUR_TYPES:
-          if ht == 'two_hr_min':
-            hours_vals[ht] = any(e.hours.get(ht) for e in tech_entries)
-          else:
-            hours_vals[ht] = sum(float(e.hours.get(ht, 0) or 0) for e in tech_entries)
-        tech = day.technicians.appendObject()
-        tech.name = name
-        if tech_entries:
-          tech.start_time = tech_entries[0].start_time
-          tech.end_time = tech_entries[-1].end_time
-        tech.hours = HoursDict(hours_vals)
-      # Set gathered AFTER all appendObject() calls — appendObject() resets it (ISS-016)
-      day.technicians.gathered = True
-    # Set gathered BEFORE len() — len() on an un-gathered DAList triggers the gather
-    # protocol which asks there_is_another, causing the lookup error (ISS-016).
-    report.job.work_days.gathered = True
-    report.job.is_multi_day = (len(report.job.work_days) > 1)
+  from docassemble.base.functions import log
+  import json
+  from docassemble.quadralocate.objects import HOUR_TYPES, HoursDict
+  # #region agent log
+  log(json.dumps({'location': 'locate_report.yml:time_entries_built', 'message': 'rebuild start', 'data': {'time_entries_len': len(report.time_entries), 'work_days_gathered_before': report.job.work_days.has_been_gathered()}, 'hypothesisId': 'H-WORKDAYS-REBUILD'}))
+  # #endregion
+  # Always rebuild from source-of-truth time entries when this block runs.
+  report.job.work_days.clear()
+  report.job.work_days.gathered = False
+  report.job.work_days.there_are_any = False
+  dates_seen = []
+  for entry in report.time_entries:
+    d = entry.date
+    if d not in dates_seen:
+      dates_seen.append(d)
+  if len(dates_seen) > 0:
+    report.job.work_days.there_are_any = True
+  for d in dates_seen:
+    day = report.job.work_days.appendObject()
+    day.date = d
+    day_entries = [e for e in report.time_entries if e.date == d]
+    if day_entries:
+      starts = [e.start_time for e in day_entries if e.start_time]
+      ends = [e.end_time for e in day_entries if e.end_time]
+      if starts:
+        day.start_time = min(starts)
+      if ends:
+        day.end_time = max(ends)
+    day.weather = report.weather
+    tech_names = []
+    for e in day_entries:
+      if e.technician_name and e.technician_name not in tech_names:
+        tech_names.append(e.technician_name)
+    for name in tech_names:
+      tech_entries = [e for e in day_entries if e.technician_name == name]
+      hours_vals = {}
+      for ht in HOUR_TYPES:
+        if ht == 'two_hr_min':
+          hours_vals[ht] = any(e.hours.get(ht) for e in tech_entries)
+        else:
+          hours_vals[ht] = sum(float(e.hours.get(ht, 0) or 0) for e in tech_entries)
+      tech = day.technicians.appendObject()
+      tech.name = name
+      if tech_entries:
+        tech.start_time = tech_entries[0].start_time
+        tech.end_time = tech_entries[-1].end_time
+      tech.hours = HoursDict(hours_vals)
+    # Set gathered AFTER all appendObject() calls — appendObject() resets it (ISS-016)
+    day.technicians.gathered = True
+  # Set gathered BEFORE len() — len() on an un-gathered DAList triggers the gather
+  # protocol which asks there_is_another, causing lookup errors.
+  report.job.work_days.gathered = True
+  report.job.work_days.there_is_another = False
+  report.job.is_multi_day = (len(report.job.work_days) > 1)
+  # #region agent log
+  log(json.dumps({'location': 'locate_report.yml:time_entries_built', 'message': 'rebuild end', 'data': {'dates_seen_len': len(dates_seen), 'work_days_len': len(report.job.work_days), 'is_multi_day': report.job.is_multi_day}, 'hypothesisId': 'H-WORKDAYS-REBUILD'}))
+  # #endregion
   time_entries_built = True
 ---
 # Satisfy lookup for work_days[i].technicians[j].hours.there_are_any (docassemble seeks a defining block).
@@ -1297,7 +1311,12 @@ code: |
 # Acceptable for current single-user usage; revisit if concurrent editing is needed.
 event: edit_report
 code: |
+  from docassemble.base.functions import log
+  import json
   report.revision_number += 1
+  # #region agent log
+  log(json.dumps({'location': 'locate_report.yml:edit_report', 'message': 'edit event start', 'data': {'time_entries_built_defined': defined('time_entries_built'), 'work_days_gathered_before': report.job.work_days.has_been_gathered()}, 'hypothesisId': 'H-EDIT-CLEAR'}))
+  # #endregion
   # ── Invalidate cached PDF attachments so they regenerate with updated data ──
   if defined('cover_pdf'):
     undefine('cover_pdf')
@@ -1320,6 +1339,10 @@ code: |
     undefine('time_entries_built')
     report.job.work_days.clear()
     report.job.work_days.gathered = False
+    report.job.work_days.there_are_any = False
+  # #region agent log
+  log(json.dumps({'location': 'locate_report.yml:edit_report', 'message': 'edit event post-clear', 'data': {'time_entries_built_defined_after': defined('time_entries_built'), 'work_days_gathered_after': report.job.work_days.has_been_gathered()}, 'hypothesisId': 'H-EDIT-CLEAR'}))
+  # #endregion
   # ── Re-show review screen ──
   review_complete = False
   force_ask('review_complete')
