@@ -2,7 +2,6 @@
 Custom Python objects for Quadra Utility Locate Report
 """
 from docassemble.base.util import DAObject, DAList, DADict, format_time, format_date
-from docassemble.base.functions import log
 from datetime import datetime, time
 
 
@@ -435,11 +434,7 @@ class PhotoPage(DAObject):
     
     def has_content(self):
         """Check if any slot has an uploaded photo."""
-        result = any(True for _ in self.get_photos_with_comments())
-        # #region agent log
-        import json; log(json.dumps({'location': 'objects.py:435', 'message': 'has_content() called', 'data': {'result': result, 'photo_count': self.photo_count()}, 'hypothesisId': 'H6'}))
-        # #endregion
-        return result
+        return any(True for _ in self.get_photos_with_comments())
     
     def photo_count(self):
         """Return the number of photos uploaded on this page."""
@@ -448,32 +443,23 @@ class PhotoPage(DAObject):
     def get_photo_fields(self, page_index, job_number=''):
         """Return dict mapping PDF form field names to values for this photo page.
         
-        Uses _extract_file() to convert DAFileList → single DAFile for PDF
-        image fields (pushbutton with 'Icon only' layout).
+        Uses _extract_file() to convert DAFileList → single DAFile, then passes
+        [FILE ref] format. PDF template must use Signature (/Sig) fields for images.
         """
-        # #region agent log
-        import json; log(json.dumps({'location': 'objects.py:443', 'message': 'get_photo_fields called', 'data': {'page_index': page_index, 'job_number': str(job_number)}, 'hypothesisId': 'H1,H2,H6'}))
-        # #endregion
         fields = {
             'quadra_job_number': str(job_number),
             'page_label': f'Photo Page {page_index + 1}',
         }
         for n in self.SLOTS:
             raw = getattr(self, f'photo_{n}', None)
-            # #region agent log
-            import json; log(json.dumps({'location': 'objects.py:456', 'message': f'Photo slot {n} raw value', 'data': {'slot': n, 'raw_type': type(raw).__name__, 'raw_is_none': raw is None, 'raw_has_len': hasattr(raw, '__len__'), 'raw_len': len(raw) if hasattr(raw, '__len__') and raw is not None else 'N/A'}, 'hypothesisId': 'H2'}))
-            # #endregion
             photo = _extract_file(raw)
-            # #region agent log
-            import json; log(json.dumps({'location': 'objects.py:463', 'message': f'Photo slot {n} after extract', 'data': {'slot': n, 'photo_type': type(photo).__name__ if photo else 'None', 'photo_is_none': photo is None, 'photo_has_path': hasattr(photo, 'path') if photo else False, 'photo_has_url': hasattr(photo, 'url_for') if photo else False, 'field_name': f'photo_{n}'}, 'hypothesisId': 'H2,H3'}))
-            # #endregion
             if photo:
-                fields[f'photo_{n}'] = photo
+                # Docassemble only places images into /Sig (signature) fields—not /Btn (push button).
+                # Pass [FILE ref] format so the filler routes to images. PDF template must use Signature fields.
+                ref = photo._get_unqualified_reference()
+                fields[f'photo_{n}'] = '[FILE ' + ref + ']'
             caption = getattr(self, f'comment_{n}', '') or ''
             fields[f'caption_{n}'] = caption
-        # #region agent log
-        import json; log(json.dumps({'location': 'objects.py:472', 'message': 'get_photo_fields returning', 'data': {'page_index': page_index, 'field_keys': list(fields.keys()), 'photo_fields_present': [k for k in fields.keys() if k.startswith('photo_')], 'caption_fields_present': [k for k in fields.keys() if k.startswith('caption_')]}, 'hypothesisId': 'H1'}))
-        # #endregion
         return fields
 
 
@@ -506,7 +492,7 @@ class Drawing(DAObject):
         }
         drawing_file = _extract_file(getattr(self, 'file', None))
         if drawing_file:
-            fields['drawing_image'] = drawing_file
+            fields['drawing_image'] = '[FILE ' + drawing_file._get_unqualified_reference() + ']'
         return fields
 
 
@@ -734,7 +720,7 @@ class LocateReport(DAObject):
         }
         cover = _extract_file(getattr(self, 'cover_photo', None))
         if cover:
-            fields['cover_photo'] = cover
+            fields['cover_photo'] = '[FILE ' + cover._get_unqualified_reference() + ']'
         return fields
     
     def get_report_fields(self):

@@ -755,6 +755,30 @@ This approach does zero DOM observation and zero DOM writes on mutation events, 
 
 ---
 
+### ISS-037 — Photos not visible in exported PDF (image field type)
+
+| Detail | Value |
+|--------|-------|
+| **Date opened** | 2026-02-11 |
+| **Date resolved** | 2026-02-11 |
+| **Status** | **RESOLVED** |
+| **Version** | 1.5.11 → 1.5.12 |
+| **Commits** | *(included in 1.5.12 commit)* |
+
+**Symptom:** Photos uploaded during the interview did not appear in the exported PDF. The photo page showed "Photos and Comments:" text but no images. Runtime logs confirmed: DAFile extraction worked, `photo_1` was passed correctly, photo page was included in concatenation.
+
+**What we tried:**
+1. ISS-020: Added `_extract_file()` to convert DAFileList → DAFile — correct but insufficient.
+2. Debug instrumentation (v1.5.10–1.5.11): Logs proved data flow was correct; issue was downstream.
+
+**What worked:** Root cause: **Docassemble only places images into PDF Signature (/Sig) fields, not Push Button (/Btn) fields.** The `photo_page.pdf` template used Push Button fields with "Icon only" layout; docassemble's pdftk filler ignores images for /Btn and only overlays onto /Sig. Two changes:
+1. **PDF template:** Change `photo_1`–`photo_6` (and `cover_photo`, `drawing_image` if applicable) from Push Button to **Signature** field type in Acrobat Pro.
+2. **Code:** Pass explicit `[FILE reference]` format for image values so docassemble reliably routes them to the images list. Applied to `get_photo_fields()`, `get_cover_fields()`, and `get_drawing_fields()`.
+
+See `docs/PHOTO_PDF_TEMPLATE.md` for step-by-step template update instructions.
+
+---
+
 <!-- 
   ┌──────────────────────────────────────────────────────────────────┐
   │  TEMPLATE — Copy this block when adding a new issue.            │
