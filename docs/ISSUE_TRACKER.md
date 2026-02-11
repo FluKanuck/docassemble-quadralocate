@@ -561,6 +561,24 @@ No existing fixes affected — time storage format (`HH:MM` strings) unchanged; 
 
 ---
 
+### ISS-028 — Cannot edit utility detail/summary text from review screen
+
+| Detail | Value |
+|--------|-------|
+| **Date opened** | 2026-02-11 |
+| **Date resolved** | 2026-02-11 |
+| **Status** | **RESOLVED** |
+| **Version** | 1.5.1 |
+| **Commits** | *(included in 1.5.1 commit)* |
+
+**Symptom:** The review screen had Edit buttons for utility **methods** (EM, GPR, etc.) but no Edit buttons for utility **detail/summary text** (the free-text comments entered on each utility's details page). Users could not navigate back to edit these comments without using the browser Back button repeatedly.
+
+**What we tried:** N/A — root cause was clear (missing review entries).
+
+**What worked:** Added 7 conditional `Edit:` entries in the review block's "Locate Details" section — one for each utility that has a `.summary` question (Electrical, Communications, Gas/Pipeline, Water, Storm, Sanitary, Unknown/Other). Each entry uses `show if: defined('report.utilities.<key>.summary')` so it only appears when that utility's summary was actually gathered (i.e., the utility has methods selected and is not out of scope). Clicking Edit navigates directly to the corresponding utility details question.
+
+---
+
 <!-- 
   ┌──────────────────────────────────────────────────────────────────┐
   │  TEMPLATE — Copy this block when adding a new issue.            │

@@ -6,7 +6,7 @@ metadata:
   authors:
     - name: Quadra Utility Locating Ltd.
   revision_date: 2026-02-11
-  version: 1.5.0
+  version: 1.5.1
 ---
 modules:
   - docassemble.quadralocate.objects
@@ -60,7 +60,7 @@ question: |
 subquestion: |
   Welcome to the Quadra Utility Locate Report system.
   
-  <small class="text-muted">Version 1.5.0</small>
+  <small class="text-muted">Version 1.5.1</small>
 field: report_action
 buttons:
   - Start New Report: new
@@ -991,6 +991,34 @@ review:
       **Unknown / Other:** ${ report.utilities.unknown.format_header() if report.utilities.unknown.has_any_method() else 'No methods selected' }
   - note: |
       ### Locate Details
+  - Edit: report.utilities.electrical.summary
+    button: |
+      **Electrical Details:** ${ (report.utilities.electrical.summary[:100] + '...') if report.utilities.electrical.summary and len(report.utilities.electrical.summary) > 100 else (report.utilities.electrical.summary or 'Not entered') }
+    show if: defined('report.utilities.electrical.summary')
+  - Edit: report.utilities.communications.summary
+    button: |
+      **Communications Details:** ${ (report.utilities.communications.summary[:100] + '...') if report.utilities.communications.summary and len(report.utilities.communications.summary) > 100 else (report.utilities.communications.summary or 'Not entered') }
+    show if: defined('report.utilities.communications.summary')
+  - Edit: report.utilities.gas.summary
+    button: |
+      **Gas / Pipeline Details:** ${ (report.utilities.gas.summary[:100] + '...') if report.utilities.gas.summary and len(report.utilities.gas.summary) > 100 else (report.utilities.gas.summary or 'Not entered') }
+    show if: defined('report.utilities.gas.summary')
+  - Edit: report.utilities.water.summary
+    button: |
+      **Water Details:** ${ (report.utilities.water.summary[:100] + '...') if report.utilities.water.summary and len(report.utilities.water.summary) > 100 else (report.utilities.water.summary or 'Not entered') }
+    show if: defined('report.utilities.water.summary')
+  - Edit: report.utilities.storm.summary
+    button: |
+      **Storm Details:** ${ (report.utilities.storm.summary[:100] + '...') if report.utilities.storm.summary and len(report.utilities.storm.summary) > 100 else (report.utilities.storm.summary or 'Not entered') }
+    show if: defined('report.utilities.storm.summary')
+  - Edit: report.utilities.sanitary.summary
+    button: |
+      **Sanitary Details:** ${ (report.utilities.sanitary.summary[:100] + '...') if report.utilities.sanitary.summary and len(report.utilities.sanitary.summary) > 100 else (report.utilities.sanitary.summary or 'Not entered') }
+    show if: defined('report.utilities.sanitary.summary')
+  - Edit: report.utilities.unknown.summary
+    button: |
+      **Unknown / Other Details:** ${ (report.utilities.unknown.summary[:100] + '...') if report.utilities.unknown.summary and len(report.utilities.unknown.summary) > 100 else (report.utilities.unknown.summary or 'Not entered') }
+    show if: defined('report.utilities.unknown.summary')
   - Edit: report.work_summary
     button: |
       **Summary of Work:** ${ (report.work_summary[:100] + '...') if report.work_summary and len(report.work_summary) > 100 else (report.work_summary or 'Not entered') }
