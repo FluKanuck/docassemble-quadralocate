@@ -667,6 +667,32 @@ This ensures every "Download PDF Report" after an edit cycle produces a fresh PD
 
 ---
 
+### ISS-033 — "Add another" still frozen despite ISS-032 debounce (MutationObserver removed)
+
+| Detail | Value |
+|--------|-------|
+| **Date opened** | 2026-02-11 |
+| **Date resolved** | 2026-02-11 |
+| **Status** | **RESOLVED** |
+| **Version** | 1.5.6 → 1.5.7 |
+| **Commits** | *(included in 1.5.7 commit)* |
+
+**Symptom:** The "Add another" button in the time-entries list collect was still unresponsive after the ISS-032 fix. The debounced MutationObserver (with `_busy` flag and 50ms `setTimeout`) was still interfering with Docassemble's own JavaScript that handles the "Add another" action.
+
+**What we tried:**
+1. ISS-032's debounce approach — reduced but did not eliminate the interference.
+
+**What worked:** Removed the `MutationObserver` entirely and replaced the whole script with **jQuery event delegation**:
+- `$(document).on('change', 'input[type="time"]', handler)` — the delegated change handler automatically fires for dynamically added rows without needing to observe DOM mutations.
+- `$(document).on('focus', 'input[type="time"]', handler)` — sets `step="900"` on new inputs when the user focuses them.
+- Existing inputs get `step="900"` set once at page load via `$('input[type="time"]').attr('step', '900')`.
+
+This approach does zero DOM observation and zero DOM writes on mutation events, so it cannot interfere with Docassemble's JavaScript.
+
+**Lesson learned:** MutationObserver is the wrong tool for augmenting dynamically added form fields. jQuery event delegation (`$(document).on(event, selector, handler)`) handles current and future elements natively with no DOM mutation side effects.
+
+---
+
 <!-- 
   ┌──────────────────────────────────────────────────────────────────┐
   │  TEMPLATE — Copy this block when adding a new issue.            │
