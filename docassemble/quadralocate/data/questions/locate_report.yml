@@ -6,7 +6,7 @@ metadata:
   authors:
     - name: Quadra Utility Locating Ltd.
   revision_date: 2026-02-11
-  version: 1.5.9
+  version: 1.5.10
 ---
 modules:
   - docassemble.quadralocate.objects
@@ -92,7 +92,7 @@ question: |
 subquestion: |
   Welcome to the Quadra Utility Locate Report system.
   
-  <small class="text-muted">Version 1.5.9</small>
+  <small class="text-muted">Version 1.5.10</small>
 field: report_action
 buttons:
   - Start New Report: new
@@ -1269,13 +1269,32 @@ attachment:
 event: download_report
 code: |
   from docassemble.base.util import pdf_concatenate, DAStaticFile
+  import json
+  from datetime import datetime
+  
+  # #region agent log
+  ts = datetime.now().isoformat(); logfile = r'q:\QuadDoc\.cursor\debug.log'; log_entry = json.dumps({'location': 'locate_report.yml:1270', 'message': 'download_report event starting', 'data': {'total_photo_pages': len(report.photo_pages), 'total_drawings': len(report.drawings) if hasattr(report, 'num_drawings') and report.num_drawings > 0 else 0}, 'timestamp': ts, 'hypothesisId': 'H5,H6'}); f = open(logfile, 'a', encoding='utf-8'); f.write(log_entry + '\n'); f.close()
+  # #endregion
   
   parts = [cover_pdf.pdf, report_pdf.pdf]
   
   # Photo pages — only include pages that have at least one photo
+  photo_pages_included = 0
   for idx, page in enumerate(report.photo_pages):
-    if page.has_content():
+    has_photos = page.has_content()
+    # #region agent log
+    ts = datetime.now().isoformat(); logfile = r'q:\QuadDoc\.cursor\debug.log'; log_entry = json.dumps({'location': 'locate_report.yml:1283', 'message': f'Checking photo page {idx}', 'data': {'page_index': idx, 'has_content': has_photos, 'photo_count': page.photo_count()}, 'timestamp': ts, 'hypothesisId': 'H6'}); f = open(logfile, 'a', encoding='utf-8'); f.write(log_entry + '\n'); f.close()
+    # #endregion
+    if has_photos:
+      photo_pages_included += 1
+      # #region agent log
+      ts = datetime.now().isoformat(); logfile = r'q:\QuadDoc\.cursor\debug.log'; log_entry = json.dumps({'location': 'locate_report.yml:1290', 'message': f'Including photo page {idx}', 'data': {'page_index': idx, 'filled_pdf_type': type(page.filled_pdf).__name__}, 'timestamp': ts, 'hypothesisId': 'H5'}); f = open(logfile, 'a', encoding='utf-8'); f.write(log_entry + '\n'); f.close()
+      # #endregion
       parts.append(page.filled_pdf.pdf)
+  
+  # #region agent log
+  ts = datetime.now().isoformat(); logfile = r'q:\QuadDoc\.cursor\debug.log'; log_entry = json.dumps({'location': 'locate_report.yml:1297', 'message': 'Photo pages processed', 'data': {'pages_included': photo_pages_included, 'total_parts_so_far': len(parts)}, 'timestamp': ts, 'hypothesisId': 'H5,H6'}); f = open(logfile, 'a', encoding='utf-8'); f.write(log_entry + '\n'); f.close()
+  # #endregion
   
   # Drawing pages — select letter or wide template based on format
   for idx, drawing in enumerate(report.drawings):
@@ -1289,6 +1308,9 @@ code: |
   parts.append(DAStaticFile(filename='data/static/legend_page.pdf'))
   
   export_name = report.get_export_filename()
+  # #region agent log
+  ts = datetime.now().isoformat(); logfile = r'q:\QuadDoc\.cursor\debug.log'; log_entry = json.dumps({'location': 'locate_report.yml:1316', 'message': 'Before pdf_concatenate', 'data': {'total_parts': len(parts), 'export_name': export_name}, 'timestamp': ts, 'hypothesisId': 'H5'}); f = open(logfile, 'a', encoding='utf-8'); f.write(log_entry + '\n'); f.close()
+  # #endregion
   final_report = pdf_concatenate(*parts, filename=export_name)
   response(file=final_report, filename=export_name, content_type='application/pdf')
 ---

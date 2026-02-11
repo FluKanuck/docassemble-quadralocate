@@ -434,7 +434,11 @@ class PhotoPage(DAObject):
     
     def has_content(self):
         """Check if any slot has an uploaded photo."""
-        return any(True for _ in self.get_photos_with_comments())
+        result = any(True for _ in self.get_photos_with_comments())
+        # #region agent log
+        import json; from datetime import datetime; ts = datetime.now().isoformat(); logfile = r'q:\QuadDoc\.cursor\debug.log'; log_entry = json.dumps({'location': 'objects.py:435', 'message': 'has_content() called', 'data': {'result': result, 'photo_count': self.photo_count()}, 'timestamp': ts, 'hypothesisId': 'H6'}); f = open(logfile, 'a', encoding='utf-8'); f.write(log_entry + '\n'); f.close()
+        # #endregion
+        return result
     
     def photo_count(self):
         """Return the number of photos uploaded on this page."""
@@ -446,17 +450,29 @@ class PhotoPage(DAObject):
         Uses _extract_file() to convert DAFileList → single DAFile for PDF
         image fields (pushbutton with 'Icon only' layout).
         """
+        # #region agent log
+        import json; from datetime import datetime; ts = datetime.now().isoformat(); logfile = r'q:\QuadDoc\.cursor\debug.log'; import os; os.makedirs(os.path.dirname(logfile), exist_ok=True); log_entry = json.dumps({'location': 'objects.py:443', 'message': 'get_photo_fields called', 'data': {'page_index': page_index, 'job_number': str(job_number)}, 'timestamp': ts, 'hypothesisId': 'H1,H2,H6'}); f = open(logfile, 'a', encoding='utf-8'); f.write(log_entry + '\n'); f.close()
+        # #endregion
         fields = {
             'quadra_job_number': str(job_number),
             'page_label': f'Photo Page {page_index + 1}',
         }
         for n in self.SLOTS:
             raw = getattr(self, f'photo_{n}', None)
+            # #region agent log
+            import json; from datetime import datetime; ts = datetime.now().isoformat(); logfile = r'q:\QuadDoc\.cursor\debug.log'; log_entry = json.dumps({'location': f'objects.py:456', 'message': f'Photo slot {n} raw value', 'data': {'slot': n, 'raw_type': type(raw).__name__, 'raw_is_none': raw is None, 'raw_has_len': hasattr(raw, '__len__'), 'raw_len': len(raw) if hasattr(raw, '__len__') and raw is not None else 'N/A'}, 'timestamp': ts, 'hypothesisId': 'H2'}); f = open(logfile, 'a', encoding='utf-8'); f.write(log_entry + '\n'); f.close()
+            # #endregion
             photo = _extract_file(raw)
+            # #region agent log
+            import json; from datetime import datetime; ts = datetime.now().isoformat(); logfile = r'q:\QuadDoc\.cursor\debug.log'; log_entry = json.dumps({'location': f'objects.py:463', 'message': f'Photo slot {n} after extract', 'data': {'slot': n, 'photo_type': type(photo).__name__ if photo else 'None', 'photo_is_none': photo is None, 'photo_has_path': hasattr(photo, 'path') if photo else False, 'photo_has_url': hasattr(photo, 'url_for') if photo else False, 'field_name': f'photo_{n}'}, 'timestamp': ts, 'hypothesisId': 'H2,H3'}); f = open(logfile, 'a', encoding='utf-8'); f.write(log_entry + '\n'); f.close()
+            # #endregion
             if photo:
                 fields[f'photo_{n}'] = photo
             caption = getattr(self, f'comment_{n}', '') or ''
             fields[f'caption_{n}'] = caption
+        # #region agent log
+        import json; from datetime import datetime; ts = datetime.now().isoformat(); logfile = r'q:\QuadDoc\.cursor\debug.log'; log_entry = json.dumps({'location': 'objects.py:472', 'message': 'get_photo_fields returning', 'data': {'page_index': page_index, 'field_keys': list(fields.keys()), 'photo_fields_present': [k for k in fields.keys() if k.startswith('photo_')], 'caption_fields_present': [k for k in fields.keys() if k.startswith('caption_')]}, 'timestamp': ts, 'hypothesisId': 'H1'}); f = open(logfile, 'a', encoding='utf-8'); f.write(log_entry + '\n'); f.close()
+        # #endregion
         return fields
 
 
