@@ -37,8 +37,21 @@ class UtilityType(DAObject):
                 return True
         return False
     
+    def is_not_in_scope(self):
+        """Check if this utility is marked as not in scope."""
+        return bool(self.methods.get('not_in_scope', False))
+    
     def should_display(self):
-        """Determine if this utility section should appear in report."""
+        """Determine if this utility section should appear in report.
+        
+        Returns False if the only selected method is 'none_in_area' (used by ditch)
+        so the utility is excluded from the combined report entirely.
+        """
+        # If the only method selected is 'none_in_area', exclude from report
+        if self.methods.get('none_in_area', False):
+            other_methods = [m for m in self.available_methods if m != 'none_in_area']
+            if not any(self.methods.get(m, False) for m in other_methods):
+                return False
         return self.has_any_method() or (hasattr(self, 'summary') and self.summary)
     
     def get_method_labels(self):
@@ -49,7 +62,13 @@ class UtilityType(DAObject):
             'gpr': 'Located with GPR',
             'visual': 'Located visually',
             'not_located': 'Not located',
-            'not_in_area': 'Not in proposed work area'
+            'not_in_area': 'Not in proposed work area',
+            'not_in_scope': 'Not in scope',
+            'none_in_area': 'None in area',
+            'opened_cb_mh': 'Opened Catchbasins/Manholes',
+            'unable_open_cb_mh': 'Unable to Open Catchbasins/Manholes',
+            'opened_mh': 'Opened Manholes',
+            'unable_open_mh': 'Unable to Open Manholes',
         }
         for method in self.available_methods:
             if self.methods.get(method, False):
@@ -77,14 +96,14 @@ class UtilityMatrix(DAObject):
     """Collection of all utility types for the locate report."""
     
     UTILITY_TYPES = [
-        ('electrical', 'Electrical', ['em', 'gpr', 'visual', 'not_located', 'not_in_area']),
-        ('communications', 'Communications', ['em', 'gpr', 'visual', 'not_located', 'not_in_area']),
-        ('gas', 'Gas / Pipeline', ['em', 'gpr', 'visual', 'not_located', 'not_in_area']),
-        ('water', 'Water', ['em', 'gpr', 'visual', 'not_located', 'not_in_area']),
-        ('storm', 'Storm', ['em', 'gpr', 'visual', 'not_located', 'not_in_area']),
-        ('sanitary', 'Sanitary', ['em', 'gpr', 'visual', 'not_located', 'not_in_area']),
-        ('ditch', 'Ditch', ['visual', 'not_located']),  # Limited methods
-        ('unknown', 'Unknown / Other', ['em', 'gpr', 'visual', 'not_located', 'not_in_area']),
+        ('electrical', 'Electrical', ['em', 'gpr', 'visual', 'not_located', 'not_in_area', 'not_in_scope']),
+        ('communications', 'Communications', ['em', 'gpr', 'visual', 'not_located', 'not_in_area', 'not_in_scope']),
+        ('gas', 'Gas / Pipeline', ['em', 'gpr', 'visual', 'not_located', 'not_in_area', 'not_in_scope']),
+        ('water', 'Water', ['em', 'gpr', 'visual', 'not_located', 'not_in_area', 'not_in_scope']),
+        ('storm', 'Storm', ['em', 'gpr', 'visual', 'not_located', 'not_in_area', 'not_in_scope', 'opened_cb_mh', 'unable_open_cb_mh']),
+        ('sanitary', 'Sanitary', ['em', 'gpr', 'visual', 'not_located', 'not_in_area', 'not_in_scope', 'opened_mh', 'unable_open_mh']),
+        ('ditch', 'Ditch', ['visual', 'not_located', 'none_in_area']),
+        ('unknown', 'Unknown / Other', ['em', 'gpr', 'visual', 'not_located', 'not_in_area', 'not_in_scope']),
     ]
     
     def init(self, *pargs, **kwargs):
@@ -102,6 +121,15 @@ class UtilityMatrix(DAObject):
             if utility.should_display():
                 active.append(utility)
         return active
+    
+    def get_not_in_scope_utilities(self):
+        """Return display names of all utilities marked as not in scope."""
+        names = []
+        for key, display_name, _ in self.UTILITY_TYPES:
+            utility = getattr(self, key)
+            if utility.is_not_in_scope():
+                names.append(display_name)
+        return names
 
 
 # Hour types and labels shared by Technician and TimeEntry (10 types; two_hr_min is Yes/No)
@@ -507,7 +535,7 @@ class LocateReport(DAObject):
                 "review said documentation.")
     
     def format_recommendations(self):
-        """Format recommendations with auto-appended missing docs."""
+        """Format recommendations with auto-appended missing docs and not-in-scope warnings."""
         reco = getattr(self, 'recommendations', '') or ''
         missing_sentence = self.format_missing_docs_sentence()
         
@@ -516,6 +544,19 @@ class LocateReport(DAObject):
                 reco = f"{reco}\r\r{missing_sentence}"
             else:
                 reco = missing_sentence
+        
+        # Dynamic not-in-scope warning (built from whichever utilities are marked)
+        not_in_scope_names = self.utilities.get_not_in_scope_utilities()
+        if not_in_scope_names:
+            scope_list = oxford_join(not_in_scope_names)
+            scope_sentence = (
+                f"{scope_list} Utilities were not in the scope of work and thus not located. "
+                "Confirm location before working near these potential utilities."
+            )
+            if reco:
+                reco = f"{reco}\r\r{scope_sentence}"
+            else:
+                reco = scope_sentence
         
         if reco:
             return f"RECOMMENDATIONS:\r{reco}"
@@ -576,7 +617,8 @@ class LocateReport(DAObject):
         return "; ".join(items)
     
     def format_materials(self):
-        """Format materials (4 items: Pin Flags, Lathe 24", Lathe 48", KMs Driven)."""
+        """Format materials (4 items: Pin Flags, Lathe 24", Lathe 48", KMs Driven).
+        Only includes materials with a quantity greater than zero."""
         items = []
         mat_fields = [
             ('pin_flags', 'Pin flags'),
@@ -586,8 +628,11 @@ class LocateReport(DAObject):
         ]
         for key, label in mat_fields:
             value = getattr(self, f'mat_{key}', None)
-            if value is not None and value != '':
-                items.append(f"{label} x{value}")
+            try:
+                if value is not None and value != '' and float(value) > 0:
+                    items.append(f"{label} x{value}")
+            except (ValueError, TypeError):
+                pass
         return "; ".join(items)
     
     def format_property_type(self):
@@ -605,7 +650,12 @@ class LocateReport(DAObject):
         """Generate the complete combined report text."""
         sections = []
         
-        # Travel Notes (first)
+        # Summary of Work (user-entered overview, first in report)
+        work_summary = getattr(self, 'work_summary', '') or ''
+        if work_summary:
+            sections.append(f"SUMMARY OF WORK PERFORMED:\r{work_summary}")
+        
+        # Travel Notes
         travel = getattr(self, 'travel_notes', '')
         if travel:
             sections.append(f"TRAVEL NOTES:\r{travel}")
@@ -615,23 +665,18 @@ class LocateReport(DAObject):
         if site_cond:
             sections.append(f"SITE CONDITIONS (Obstructions, inaccessible areas, changes to scope etc.):\r{site_cond}")
         
-        # Utility sections
+        # Utility sections (storm and sanitary now have individual summaries)
         for utility in self.utilities.get_active_utilities():
             section = utility.format_section()
             if section:
                 sections.append(section)
-        
-        # Storm/sanitary combined summary (gathered as a single field)
-        storm_san_summary = getattr(self, 'storm_sanitary_summary', '') or ''
-        if storm_san_summary:
-            sections.append(f"STORM AND SANITARY DETAILS:\r{storm_san_summary}")
         
         # Hydrovac recommendation
         hydrovac_section = self.hydrovac.format_section()
         if hydrovac_section:
             sections.append(hydrovac_section)
         
-        # Recommendations (with missing docs)
+        # Recommendations (with missing docs and not-in-scope warnings)
         reco_section = self.format_recommendations()
         if reco_section:
             sections.append(reco_section)
@@ -662,12 +707,14 @@ class LocateReport(DAObject):
         The client_signature field is intentionally excluded — it is a digital
         signature field in the PDF that the client signs on the exported document.
         """
+        combined = self.format_combined_report()
         fields = {
             'quadra_job_number': getattr(self, 'quadra_job_number', ''),
             'bc1_call_number': self.format_bc1_display(),
             'weather': getattr(self, 'weather', '') or '',
             'billing_details': self.format_billing_details(),
-            'combined_report': self.format_combined_report(),
+            'combined_report': combined,
+            'summary_text': combined,  # PDF template may use either field name
             'client_po_number': getattr(self, 'client_po_number', '') or '',
             'client_rep_name': getattr(self, 'client_rep_name', '') or '',
             'client_job_number': getattr(self, 'client_job_number', '') or '',
@@ -695,7 +742,7 @@ class LocateReport(DAObject):
         filename = re.sub(r'[<>:"/\\|?*]', '', filename)
         # Collapse multiple spaces
         filename = re.sub(r'\s+', ' ', filename).strip()
-        return filename
+        return filename + '.pdf'
 
 
 # Helper functions

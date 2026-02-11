@@ -5,8 +5,8 @@ metadata:
   description: Site Locate Report for Quadra Utility Locating Ltd.
   authors:
     - name: Quadra Utility Locating Ltd.
-  revision_date: 2026-02-10
-  version: 1.3.0
+  revision_date: 2026-02-11
+  version: 1.4.0
 ---
 modules:
   - docassemble.quadralocate.objects
@@ -60,7 +60,7 @@ question: |
 subquestion: |
   Welcome to the Quadra Utility Locate Report system.
   
-  <small class="text-muted">Version 1.3.0</small>
+  <small class="text-muted">Version 1.4.0</small>
 field: report_action
 buttons:
   - Start New Report: new
@@ -390,6 +390,9 @@ fields:
   - Not in Proposed Work Area: report.utilities.electrical.methods['not_in_area']
     datatype: yesno
     default: False
+  - Not in Scope: report.utilities.electrical.methods['not_in_scope']
+    datatype: yesno
+    default: False
 section: utilities
 ---
 question: |
@@ -410,6 +413,9 @@ fields:
     datatype: yesno
     default: False
   - Not in Proposed Work Area: report.utilities.communications.methods['not_in_area']
+    datatype: yesno
+    default: False
+  - Not in Scope: report.utilities.communications.methods['not_in_scope']
     datatype: yesno
     default: False
 section: utilities
@@ -434,6 +440,9 @@ fields:
   - Not in Proposed Work Area: report.utilities.gas.methods['not_in_area']
     datatype: yesno
     default: False
+  - Not in Scope: report.utilities.gas.methods['not_in_scope']
+    datatype: yesno
+    default: False
 section: utilities
 ---
 question: |
@@ -454,6 +463,9 @@ fields:
     datatype: yesno
     default: False
   - Not in Proposed Work Area: report.utilities.water.methods['not_in_area']
+    datatype: yesno
+    default: False
+  - Not in Scope: report.utilities.water.methods['not_in_scope']
     datatype: yesno
     default: False
 section: utilities
@@ -478,6 +490,15 @@ fields:
   - Not in Proposed Work Area: report.utilities.storm.methods['not_in_area']
     datatype: yesno
     default: False
+  - Not in Scope: report.utilities.storm.methods['not_in_scope']
+    datatype: yesno
+    default: False
+  - Opened Catchbasins/Manholes: report.utilities.storm.methods['opened_cb_mh']
+    datatype: yesno
+    default: False
+  - Unable to Open Catchbasins/Manholes: report.utilities.storm.methods['unable_open_cb_mh']
+    datatype: yesno
+    default: False
 section: utilities
 ---
 question: |
@@ -500,6 +521,15 @@ fields:
   - Not in Proposed Work Area: report.utilities.sanitary.methods['not_in_area']
     datatype: yesno
     default: False
+  - Not in Scope: report.utilities.sanitary.methods['not_in_scope']
+    datatype: yesno
+    default: False
+  - Opened Manholes: report.utilities.sanitary.methods['opened_mh']
+    datatype: yesno
+    default: False
+  - Unable to Open Manholes: report.utilities.sanitary.methods['unable_open_mh']
+    datatype: yesno
+    default: False
 section: utilities
 ---
 question: |
@@ -511,6 +541,9 @@ fields:
     datatype: yesno
     default: False
   - Not Located: report.utilities.ditch.methods['not_located']
+    datatype: yesno
+    default: False
+  - None in Area: report.utilities.ditch.methods['none_in_area']
     datatype: yesno
     default: False
 section: utilities
@@ -535,6 +568,9 @@ fields:
   - Not in Proposed Work Area: report.utilities.unknown.methods['not_in_area']
     datatype: yesno
     default: False
+  - Not in Scope: report.utilities.unknown.methods['not_in_scope']
+    datatype: yesno
+    default: False
 section: utilities
 ---
 # ============================================
@@ -551,7 +587,7 @@ fields:
 section: details
 show if:
   code: |
-    report.utilities.electrical.has_any_method()
+    report.utilities.electrical.has_any_method() and not report.utilities.electrical.is_not_in_scope()
 ---
 question: |
   Communications Details
@@ -564,7 +600,7 @@ fields:
 section: details
 show if:
   code: |
-    report.utilities.communications.has_any_method()
+    report.utilities.communications.has_any_method() and not report.utilities.communications.is_not_in_scope()
 ---
 question: |
   Gas / Pipeline Details
@@ -577,7 +613,7 @@ fields:
 section: details
 show if:
   code: |
-    report.utilities.gas.has_any_method()
+    report.utilities.gas.has_any_method() and not report.utilities.gas.is_not_in_scope()
 ---
 question: |
   Water Details
@@ -590,20 +626,33 @@ fields:
 section: details
 show if:
   code: |
-    report.utilities.water.has_any_method()
+    report.utilities.water.has_any_method() and not report.utilities.water.is_not_in_scope()
 ---
 question: |
-  Storm and Sanitary Details
+  Storm Details
 subquestion: |
-  Provide details for storm and sanitary utility findings.
+  Provide details for storm utility findings.
 fields:
-  - Storm and Sanitary Summary: report.storm_sanitary_summary
+  - Storm Summary: report.utilities.storm.summary
     datatype: area
     required: False
 section: details
 show if:
   code: |
-    report.utilities.storm.has_any_method() or report.utilities.sanitary.has_any_method()
+    report.utilities.storm.has_any_method() and not report.utilities.storm.is_not_in_scope()
+---
+question: |
+  Sanitary Details
+subquestion: |
+  Provide details for sanitary utility findings.
+fields:
+  - Sanitary Summary: report.utilities.sanitary.summary
+    datatype: area
+    required: False
+section: details
+show if:
+  code: |
+    report.utilities.sanitary.has_any_method() and not report.utilities.sanitary.is_not_in_scope()
 ---
 question: |
   Unknown / Other Details
@@ -616,7 +665,20 @@ fields:
 section: details
 show if:
   code: |
-    report.utilities.unknown.has_any_method()
+    report.utilities.unknown.has_any_method() and not report.utilities.unknown.is_not_in_scope()
+---
+# ============================================
+# SUMMARY OF WORK PERFORMED
+# ============================================
+question: |
+  Summary of Work Performed
+subquestion: |
+  Provide a brief summary of the work performed on this locate.
+fields:
+  - Summary of Work: report.work_summary
+    datatype: area
+    required: False
+section: details
 ---
 # ============================================
 # SITE CONDITIONS & TRAVEL NOTES
@@ -852,55 +914,112 @@ fields:
 section: signatures
 ---
 # ============================================
-# REVIEW SCREEN
+# REVIEW SCREEN (with Edit buttons for direct navigation)
 # ============================================
 question: |
   Review Your Report
 subquestion: |
-  ### Job Information
-  
-  | Field | Value |
-  |-------|-------|
-  | Client | ${ report.client_company } |
-  | Quadra Job # | ${ report.quadra_job_number } |
-  | Site Address | ${ report.site_address } |
-  | Date | ${ report.site_visit_date } |
-  | BC 1 Call | ${ report.format_bc1_display() } |
-  | Prepared By | ${ report.technician_name } |
-  
-  ### Billing Details
-  
-  ```
-  ${ report.format_billing_details() }
-  ```
-  
-  ### Utilities Located
-  
-  % for utility in report.utilities.get_active_utilities():
-  - **${ utility.format_header() }**
-  % endfor
-  
-  % if report.hydrovac.recommended:
-  ### Hydrovac Recommendation
-  
-  ${ report.hydrovac.format_section() }
-  % endif
-  
-  ### Media Attachments
-  
-  - **Photo Pages:** ${ len(report.photo_pages) } (${ sum(p.photo_count() for p in report.photo_pages if p.has_content()) } photos)
-  - **Drawings:** ${ report.num_drawings }
-  % if report.num_drawings > 0:
-  % for drawing in report.drawings:
-  % if drawing.file:
-    - ${ drawing.title }: ${ drawing.get_format_label() }
-  % endif
-  % endfor
-  % endif
-  
-  ---
-  
-  **Ready to generate the report?**
+  Review your answers below. Click **Edit** next to any item to change it.
+review:
+  - note: |
+      ### Job Information
+  - Edit: report.client_company
+    button: |
+      **Client:** ${ report.client_company }
+  - Edit: report.quadra_job_number
+    button: |
+      **Quadra Job #:** ${ report.quadra_job_number }
+  - Edit: report.site_address
+    button: |
+      **Site Address:** ${ report.site_address }
+  - Edit: report.site_visit_date
+    button: |
+      **Site Visit Date:** ${ report.site_visit_date }
+  - Edit: report.bc1_provider
+    button: |
+      **BC 1 Call:** ${ report.format_bc1_display() }
+  - Edit: report.client_rep_name
+    button: |
+      **Client Rep:** ${ report.client_rep_name or 'None' }
+  - Edit: report.technician_name
+    button: |
+      **Prepared By:** ${ report.technician_name }
+  - note: |
+      ### Time & Billing
+  - Edit: report.time_entries[0].date
+    button: |
+      **Time Entries:** ${ len(report.time_entries) } entries
+  - Edit: report.weather
+    button: |
+      **Weather:** ${ report.weather or 'Not specified' }
+  - Edit: report.supp_parking
+    button: |
+      **Supplemental:** ${ report.format_supplemental() or 'None' }
+  - Edit: report.mat_pin_flags
+    button: |
+      **Materials:** ${ report.format_materials() or 'None' }
+  - Edit: report.property_type
+    button: |
+      **Property Type:** ${ report.format_property_type() }
+  - note: |
+      ### Utility Locating
+  - Edit: report.utilities.electrical.methods['em']
+    button: |
+      **Electrical:** ${ report.utilities.electrical.format_header() if report.utilities.electrical.has_any_method() else 'No methods selected' }
+  - Edit: report.utilities.communications.methods['em']
+    button: |
+      **Communications:** ${ report.utilities.communications.format_header() if report.utilities.communications.has_any_method() else 'No methods selected' }
+  - Edit: report.utilities.gas.methods['em']
+    button: |
+      **Gas / Pipeline:** ${ report.utilities.gas.format_header() if report.utilities.gas.has_any_method() else 'No methods selected' }
+  - Edit: report.utilities.water.methods['em']
+    button: |
+      **Water:** ${ report.utilities.water.format_header() if report.utilities.water.has_any_method() else 'No methods selected' }
+  - Edit: report.utilities.storm.methods['em']
+    button: |
+      **Storm:** ${ report.utilities.storm.format_header() if report.utilities.storm.has_any_method() else 'No methods selected' }
+  - Edit: report.utilities.sanitary.methods['em']
+    button: |
+      **Sanitary:** ${ report.utilities.sanitary.format_header() if report.utilities.sanitary.has_any_method() else 'No methods selected' }
+  - Edit: report.utilities.ditch.methods['visual']
+    button: |
+      **Ditch:** ${ report.utilities.ditch.format_header() if report.utilities.ditch.has_any_method() else 'No methods selected' }
+  - Edit: report.utilities.unknown.methods['em']
+    button: |
+      **Unknown / Other:** ${ report.utilities.unknown.format_header() if report.utilities.unknown.has_any_method() else 'No methods selected' }
+  - note: |
+      ### Locate Details
+  - Edit: report.work_summary
+    button: |
+      **Summary of Work:** ${ (report.work_summary[:100] + '...') if report.work_summary and len(report.work_summary) > 100 else (report.work_summary or 'Not entered') }
+  - Edit: report.site_conditions
+    button: |
+      **Site Conditions:** ${ (report.site_conditions[:100] + '...') if report.site_conditions and len(report.site_conditions) > 100 else (report.site_conditions or 'Not entered') }
+  - Edit: report.travel_notes
+    button: |
+      **Travel Notes:** ${ (report.travel_notes[:100] + '...') if report.travel_notes and len(report.travel_notes) > 100 else (report.travel_notes or 'Not entered') }
+  - note: |
+      ### Hydrovac & Recommendations
+  - Edit: report.hydrovac.recommended
+    button: |
+      **Hydrovac:** ${ 'Recommended' if report.hydrovac.recommended else 'Not recommended' }
+  - Edit: report.missing_docs['hydro']
+    button: |
+      **Missing Docs:** ${ report.format_missing_docs_sentence() or 'None' }
+  - Edit: report.recommendations
+    button: |
+      **Recommendations:** ${ (report.recommendations[:100] + '...') if report.recommendations and len(report.recommendations) > 100 else (report.recommendations or 'None') }
+  - note: |
+      ### Media
+  - Edit: report.cover_photo_complete
+    button: |
+      **Cover Photo:** ${ 'Uploaded' if report.cover_photo else 'None' }
+  - Edit: report.photo_pages[0].page_complete
+    button: |
+      **Photo Pages:** ${ sum(p.photo_count() for p in report.photo_pages if p.has_content()) } photos
+  - Edit: report.num_drawings
+    button: |
+      **Drawings:** ${ report.num_drawings }
 continue button field: review_complete
 continue button label: Generate Report
 section: review
@@ -949,22 +1068,27 @@ code: |
   report.utilities.ditch.methods['visual']
   report.utilities.unknown.methods['em']
   
-  # Site conditions and travel notes (start of Locate Details section)
+  # Summary of work (before site conditions)
+  report.work_summary
+  
+  # Site conditions and travel notes
   report.site_conditions
   report.travel_notes
   
-  # Conditional utility details
-  if report.utilities.electrical.has_any_method():
+  # Conditional utility details (skip if utility is not in scope)
+  if report.utilities.electrical.has_any_method() and not report.utilities.electrical.is_not_in_scope():
     report.utilities.electrical.summary
-  if report.utilities.communications.has_any_method():
+  if report.utilities.communications.has_any_method() and not report.utilities.communications.is_not_in_scope():
     report.utilities.communications.summary
-  if report.utilities.gas.has_any_method():
+  if report.utilities.gas.has_any_method() and not report.utilities.gas.is_not_in_scope():
     report.utilities.gas.summary
-  if report.utilities.water.has_any_method():
+  if report.utilities.water.has_any_method() and not report.utilities.water.is_not_in_scope():
     report.utilities.water.summary
-  if report.utilities.storm.has_any_method() or report.utilities.sanitary.has_any_method():
-    report.storm_sanitary_summary
-  if report.utilities.unknown.has_any_method():
+  if report.utilities.storm.has_any_method() and not report.utilities.storm.is_not_in_scope():
+    report.utilities.storm.summary
+  if report.utilities.sanitary.has_any_method() and not report.utilities.sanitary.is_not_in_scope():
+    report.utilities.sanitary.summary
+  if report.utilities.unknown.has_any_method() and not report.utilities.unknown.is_not_in_scope():
     report.utilities.unknown.summary
   
   # Hydrovac
@@ -1097,8 +1221,9 @@ code: |
   # Legend page (static — no form fields)
   parts.append(DAStaticFile(filename='data/static/legend_page.pdf'))
   
-  final_report = pdf_concatenate(*parts, filename=report.get_export_filename())
-  response(file=final_report, content_type='application/pdf')
+  export_name = report.get_export_filename()
+  final_report = pdf_concatenate(*parts, filename=export_name)
+  response(file=final_report, filename=export_name, content_type='application/pdf')
 ---
 # WARNING: revision_number increment is not atomic. If multiple users
 # trigger this event simultaneously, the count may be incorrect.

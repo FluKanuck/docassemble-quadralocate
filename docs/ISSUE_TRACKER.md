@@ -392,6 +392,151 @@ All previous fixes (ISS-012 through ISS-015) verified intact.
 
 ---
 
+### ISS-019 — Export filename duplicated with "file." prefix
+
+| Detail | Value |
+|--------|-------|
+| **Date opened** | 2026-02-11 |
+| **Date resolved** | 2026-02-11 |
+| **Status** | **RESOLVED** |
+| **Version** | 1.4.0 |
+| **Commits** | *(included in 1.4.0 commit)* |
+
+**Symptom:** Exported PDF filename appeared as `file.2026-02-10 test company 123 testing rd burnaby jt-12345.2026-02-10 test company 123 testing rd burnaby jt-12345` — the name was duplicated with a `file.` prefix.
+
+**What we tried:** N/A — root cause was clear.
+
+**What worked:** Two changes: (1) `get_export_filename()` now appends `.pdf` to the returned filename, and (2) the `download_report` event passes `filename=` explicitly to `response()` in addition to `pdf_concatenate()`.
+
+---
+
+### ISS-020 — Photos not visible in exported PDF
+
+| Detail | Value |
+|--------|-------|
+| **Date opened** | 2026-02-11 |
+| **Date resolved** | *unresolved (code side verified)* |
+| **Status** | **OPEN** |
+| **Version** | 1.4.0 |
+| **Commits** | *(included in 1.4.0 commit)* |
+
+**Symptom:** Photo pages in the exported PDF are blank — no images visible despite photos being uploaded during the interview.
+
+**What we tried:**
+1. Verified the code path: `get_photo_fields()` correctly passes DAFile objects for `photo_1`–`photo_6` fields. The `pdf_concatenate()` assembly includes photo pages with `has_content()` checks. Code logic is correct.
+
+**What worked:** Pending — the most likely cause is the `photo_page.pdf` template's form fields are standard text fields instead of image-capable fields (pushbutton with "Icon only" layout). The template needs to be inspected and rebuilt in Acrobat Pro. Compare field types with `cover_page.pdf` if cover photo works.
+
+---
+
+### ISS-021 — Summary of Work Performed field empty in PDF
+
+| Detail | Value |
+|--------|-------|
+| **Date opened** | 2026-02-11 |
+| **Date resolved** | 2026-02-11 |
+| **Status** | **RESOLVED** |
+| **Version** | 1.4.0 |
+| **Commits** | *(included in 1.4.0 commit)* |
+
+**Symptom:** "Summary of Work Performed" area on the report page PDF was empty. No interview question existed to collect a work summary, and the PDF field name may have been `summary_text` while the code mapped to `combined_report`.
+
+**What we tried:** N/A — root causes identified on first analysis.
+
+**What worked:** Three changes: (1) Added a "Summary of Work Performed" question (`report.work_summary`) in the interview, placed before site conditions in the mandatory flow. (2) Included `work_summary` as the first section in `format_combined_report()`. (3) Added `summary_text` as an additional field mapping in `get_report_fields()` (alongside `combined_report`) to cover both possible PDF field names.
+
+---
+
+### ISS-022 — No "Not in Scope" option for utility locating
+
+| Detail | Value |
+|--------|-------|
+| **Date opened** | 2026-02-11 |
+| **Date resolved** | 2026-02-11 |
+| **Status** | **RESOLVED** |
+| **Version** | 1.4.0 |
+| **Commits** | *(included in 1.4.0 commit)* |
+
+**Symptom:** No way to mark a utility as "not in scope" — all utilities required either a locate method or appeared in the report as located.
+
+**What we tried:** N/A — new feature.
+
+**What worked:** Added `not_in_scope` to all utility types (except ditch which uses `none_in_area`). Added `is_not_in_scope()` method on `UtilityType`. Added `get_not_in_scope_utilities()` on `UtilityMatrix` that dynamically collects display names of all not-in-scope utilities. `format_recommendations()` now auto-appends a dynamic warning sentence using `oxford_join()` — scales from 1 utility to any number. The mandatory flow skips the details/summary question for not-in-scope utilities. The utility still appears in the report header (e.g., "ELECTRICAL (Not in scope):").
+
+---
+
+### ISS-023 — Ditch has no "None in Area" option
+
+| Detail | Value |
+|--------|-------|
+| **Date opened** | 2026-02-11 |
+| **Date resolved** | 2026-02-11 |
+| **Status** | **RESOLVED** |
+| **Version** | 1.4.0 |
+| **Commits** | *(included in 1.4.0 commit)* |
+
+**Symptom:** No way to indicate "no ditch in area." Ditch always appeared in the report if any method was selected.
+
+**What we tried:** N/A — new feature.
+
+**What worked:** Added `none_in_area` to ditch's available methods. Updated `should_display()` to return `False` if the only selected method is `none_in_area`, excluding ditch from the combined report when selected.
+
+---
+
+### ISS-024 — Materials showing with zero quantities in billing
+
+| Detail | Value |
+|--------|-------|
+| **Date opened** | 2026-02-11 |
+| **Date resolved** | 2026-02-11 |
+| **Status** | **RESOLVED** |
+| **Version** | 1.4.0 |
+| **Commits** | *(included in 1.4.0 commit)* |
+
+**Symptom:** Materials appeared in billing details even when quantity was 0 (e.g., "Pin flags x0").
+
+**What we tried:** N/A — root cause was clear.
+
+**What worked:** Updated `format_materials()` to use `float(value) > 0` check (with try/except safety) instead of `value is not None and value != ''`. Zero values and empty strings are now excluded.
+
+---
+
+### ISS-025 — Storm and Sanitary comments lumped under combined heading
+
+| Detail | Value |
+|--------|-------|
+| **Date opened** | 2026-02-11 |
+| **Date resolved** | 2026-02-11 |
+| **Status** | **RESOLVED** |
+| **Version** | 1.4.0 |
+| **Commits** | *(included in 1.4.0 commit)* |
+
+**Symptom:** Storm and Sanitary each had their own headers in the combined report (e.g., "STORM (Located with GPR):") but their comments were lumped under a single "STORM AND SANITARY DETAILS:" heading instead of appearing under each utility's individual header.
+
+**What we tried:** N/A — architectural issue identified.
+
+**What worked:** Five changes: (1) Removed the combined `report.storm_sanitary_summary` question. (2) Added separate detail questions for `report.utilities.storm.summary` and `report.utilities.sanitary.summary`. (3) Updated the mandatory flow with individual gates for storm and sanitary. (4) Removed the "STORM AND SANITARY DETAILS" section from `format_combined_report()` — storm and sanitary now flow through the standard `get_active_utilities()` loop like every other utility. (5) Added new Storm-specific methods (`opened_cb_mh`, `unable_open_cb_mh`) and Sanitary-specific methods (`opened_mh`, `unable_open_mh`) to `UTILITY_TYPES` with corresponding labels and YAML yesno fields.
+
+---
+
+### ISS-026 — Review screen requires Back button to edit earlier answers
+
+| Detail | Value |
+|--------|-------|
+| **Date opened** | 2026-02-11 |
+| **Date resolved** | 2026-02-11 |
+| **Status** | **RESOLVED** |
+| **Version** | 1.4.0 |
+| **Commits** | *(included in 1.4.0 commit)* |
+
+**Symptom:** The review screen was a static `question:` block with no way to jump to specific questions. Users had to hit "Back" repeatedly to make edits.
+
+**What we tried:** N/A — UX redesign.
+
+**What worked:** Replaced the static review block with docassemble's native `review:` block containing `Edit:` entries for all major variables, grouped by section (Job Information, Time & Billing, Utility Locating, Locate Details, Hydrovac & Recommendations, Media). Each entry shows the current value and provides an "Edit" button that jumps directly to the question defining that variable.
+
+---
+
 <!-- 
   ┌──────────────────────────────────────────────────────────────────┐
   │  TEMPLATE — Copy this block when adding a new issue.            │
