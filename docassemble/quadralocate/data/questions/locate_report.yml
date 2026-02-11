@@ -6,7 +6,7 @@ metadata:
   authors:
     - name: Quadra Utility Locating Ltd.
   revision_date: 2026-02-11
-  version: 1.5.3
+  version: 1.5.4
 ---
 modules:
   - docassemble.quadralocate.objects
@@ -60,7 +60,7 @@ question: |
 subquestion: |
   Welcome to the Quadra Utility Locate Report system.
   
-  <small class="text-muted">Version 1.5.2</small>
+  <small class="text-muted">Version 1.5.4</small>
 field: report_action
 buttons:
   - Start New Report: new
@@ -155,10 +155,10 @@ fields:
   - Technician Name: report.time_entries[i].technician_name
   - Start Time: report.time_entries[i].start_time
     choices:
-      - code: time_15min_choices()
+      code: time_15min_choices()
   - End Time: report.time_entries[i].end_time
     choices:
-      - code: time_15min_choices()
+      code: time_15min_choices()
 section: time_billing
 ---
 question: |

@@ -624,6 +624,26 @@ This ensures every "Download PDF Report" after an edit cycle produces a fresh PD
 
 ---
 
+### ISS-031 — Time on Site start/end dropdowns show only "code" option
+
+| Detail | Value |
+|--------|-------|
+| **Date opened** | 2026-02-11 |
+| **Date resolved** | 2026-02-11 |
+| **Status** | **RESOLVED** |
+| **Version** | 1.5.4 |
+| **Commits** | *(included in 1.5.4 commit)* |
+
+**Symptom:** In the "Time on Site" list-collect question, the Start Time and End Time dropdowns each showed a single option labelled "code" instead of the expected 96 time choices (15-minute increments from 12:00 AM to 11:45 PM).
+
+**What we tried:** N/A — root cause identified on first analysis.
+
+**What worked:** The YAML syntax `- code: time_15min_choices()` (with a leading dash) was being interpreted by Docassemble as a literal choice with display label "code" and stored value `time_15min_choices()`. In Docassemble, code-generated choices require the mapping syntax `code: time_15min_choices()` (without the dash) directly under `choices:`. Removed the `- ` prefix from both the Start Time and End Time field `choices` blocks. The `time_15min_choices()` function itself was correct; only the YAML indirection syntax was wrong.
+
+**Lesson learned:** In Docassemble `choices:`, use `code: expression` (mapping key) to run Python code that returns a list of choices. Using `- code: expression` (list item) creates a literal choice labelled "code".
+
+---
+
 <!-- 
   ┌──────────────────────────────────────────────────────────────────┐
   │  TEMPLATE — Copy this block when adding a new issue.            │
