@@ -624,23 +624,24 @@ This ensures every "Download PDF Report" after an edit cycle produces a fresh PD
 
 ---
 
-### ISS-031 — Time on Site start/end dropdowns show only "code" option
+### ISS-031 — Time on Site start/end fields: replace 96-item dropdown with native time picker
 
 | Detail | Value |
 |--------|-------|
 | **Date opened** | 2026-02-11 |
 | **Date resolved** | 2026-02-11 |
 | **Status** | **RESOLVED** |
-| **Version** | 1.5.4 |
-| **Commits** | *(included in 1.5.4 commit)* |
+| **Version** | 1.5.4 → 1.5.5 |
+| **Commits** | *(included in 1.5.4 and 1.5.5 commits)* |
 
-**Symptom:** In the "Time on Site" list-collect question, the Start Time and End Time dropdowns each showed a single option labelled "code" instead of the expected 96 time choices (15-minute increments from 12:00 AM to 11:45 PM).
+**Symptom:** In the "Time on Site" list-collect question, the Start Time and End Time fields showed a dropdown with a single option labelled "code" — the `choices:` YAML used list-item syntax (`- code: time_15min_choices()`) instead of mapping syntax (`code: time_15min_choices()`), causing Docassemble to treat "code" as a literal choice label. Even after fixing the syntax (v1.5.4), the 96-item dropdown was a poor UX.
 
-**What we tried:** N/A — root cause identified on first analysis.
+**What we tried:**
+1. Fixed the YAML syntax from `- code:` (list item) to `code:` (mapping key) — v1.5.4. This restored the full 96-choice dropdown, but scrolling through 96 options was not a good experience.
 
-**What worked:** The YAML syntax `- code: time_15min_choices()` (with a leading dash) was being interpreted by Docassemble as a literal choice with display label "code" and stored value `time_15min_choices()`. In Docassemble, code-generated choices require the mapping syntax `code: time_15min_choices()` (without the dash) directly under `choices:`. Removed the `- ` prefix from both the Start Time and End Time field `choices` blocks. The `time_15min_choices()` function itself was correct; only the YAML indirection syntax was wrong.
+**What worked:** Replaced the code-generated dropdown entirely with the native HTML5 time picker (`datatype: time`) plus a JavaScript `step="900"` attribute (900 seconds = 15 minutes). The browser's built-in time spinner/clock UI now snaps to 15-minute increments only. A MutationObserver in the `script` block ensures the step attribute is also applied to dynamically added rows from `list collect`. Updated `format_time_12hr()` in objects.py to handle `datetime.datetime` objects (including Docassemble's `DADateTime`) via `hasattr(time_val, 'hour')` — previously only handled `str` and `datetime.time`.
 
-**Lesson learned:** In Docassemble `choices:`, use `code: expression` (mapping key) to run Python code that returns a list of choices. Using `- code: expression` (list item) creates a literal choice labelled "code".
+**Lesson learned:** HTML5 `<input type="time" step="900">` is the cleanest way to restrict time input to 15-minute increments. Docassemble's `datatype: time` stores values as `DADateTime` (a `datetime.datetime` subclass), not `datetime.time` — type-checking code must account for both.
 
 ---
 

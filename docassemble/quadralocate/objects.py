@@ -808,7 +808,10 @@ def format_time_12hr(time_val):
         except (ValueError, IndexError, TypeError):
             return str(time_val)
     
-    if isinstance(time_val, time):
+    # Handle datetime.time AND datetime.datetime (including DADateTime from
+    # datatype: time fields).  datetime.datetime is NOT a subclass of
+    # datetime.time, so we check for the .hour attribute generically.
+    if hasattr(time_val, 'hour') and hasattr(time_val, 'minute'):
         hour = time_val.hour
         minute = time_val.minute
         if hour == 0:

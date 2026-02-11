@@ -6,7 +6,7 @@ metadata:
   authors:
     - name: Quadra Utility Locating Ltd.
   revision_date: 2026-02-11
-  version: 1.5.4
+  version: 1.5.5
 ---
 modules:
   - docassemble.quadralocate.objects
@@ -60,7 +60,7 @@ question: |
 subquestion: |
   Welcome to the Quadra Utility Locate Report system.
   
-  <small class="text-muted">Version 1.5.4</small>
+  <small class="text-muted">Version 1.5.5</small>
 field: report_action
 buttons:
   - Start New Report: new
@@ -154,11 +154,21 @@ fields:
     default: ${ report.site_visit_date if defined('report.site_visit_date') else None }
   - Technician Name: report.time_entries[i].technician_name
   - Start Time: report.time_entries[i].start_time
-    choices:
-      code: time_15min_choices()
+    datatype: time
   - End Time: report.time_entries[i].end_time
-    choices:
-      code: time_15min_choices()
+    datatype: time
+script: |
+  <script>
+    // Restrict time inputs to 15-minute increments (step = 900 seconds).
+    // Uses MutationObserver to also catch rows added dynamically by list collect.
+    function setTimeStep() {
+      $('input[type="time"]').attr('step', '900');
+    }
+    setTimeStep();
+    var observer = new MutationObserver(function() { setTimeStep(); });
+    observer.observe(document.querySelector('form') || document.body,
+                     { childList: true, subtree: true });
+  </script>
 section: time_billing
 ---
 question: |
