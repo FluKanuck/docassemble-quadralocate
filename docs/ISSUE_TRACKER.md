@@ -779,6 +779,29 @@ See `docs/PHOTO_PDF_TEMPLATE.md` for step-by-step template update instructions.
 
 ---
 
+### ISS-038 — Cover photo export crash on `_get_unqualified_reference`
+
+| Detail | Value |
+|--------|-------|
+| **Date opened** | 2026-02-11 |
+| **Date resolved** | *unresolved* |
+| **Status** | **TRIED** |
+| **Version** | 1.5.14 |
+| **Commits** | *(pending)* |
+
+**Symptom:** Generating the report raises: *"reference to variable `report.cover_photo[0]._get_unqualified_reference` could not be looked up"*.
+
+**What we tried:**
+1. Replaced direct `_get_unqualified_reference()` usage with a safe `_to_pdf_file_value()` helper that:
+   - extracts the file with `_extract_file()`,
+   - prefers `str(DAFile)` (Docassemble `[FILE ...]` markup),
+   - falls back to returning the DAFile object.
+2. Added runtime logs (via `log(json.dumps(...))`) in `_to_pdf_file_value()` to capture conversion behavior for `cover_photo`, `photo_n`, and `drawing_image`.
+
+**What worked:** *Pending verification run.*
+
+---
+
 <!-- 
   ┌──────────────────────────────────────────────────────────────────┐
   │  TEMPLATE — Copy this block when adding a new issue.            │

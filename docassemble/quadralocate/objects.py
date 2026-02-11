@@ -2,6 +2,8 @@
 Custom Python objects for Quadra Utility Locate Report
 """
 from docassemble.base.util import DAObject, DAList, DADict, format_time, format_date
+from docassemble.base.functions import log
+import json
 from datetime import datetime, time
 
 
@@ -452,12 +454,9 @@ class PhotoPage(DAObject):
         }
         for n in self.SLOTS:
             raw = getattr(self, f'photo_{n}', None)
-            photo = _extract_file(raw)
-            if photo:
-                # Docassemble only places images into /Sig (signature) fields—not /Btn (push button).
-                # Pass [FILE ref] format so the filler routes to images. PDF template must use Signature fields.
-                ref = photo._get_unqualified_reference()
-                fields[f'photo_{n}'] = '[FILE ' + ref + ']'
+            photo_val = _to_pdf_file_value(raw, f'photo_{n}')
+            if photo_val:
+                fields[f'photo_{n}'] = photo_val
             caption = getattr(self, f'comment_{n}', '') or ''
             fields[f'caption_{n}'] = caption
         return fields
@@ -490,9 +489,9 @@ class Drawing(DAObject):
             'quadra_job_number': str(job_number),
             'drawing_title': getattr(self, 'title', '') or '',
         }
-        drawing_file = _extract_file(getattr(self, 'file', None))
-        if drawing_file:
-            fields['drawing_image'] = '[FILE ' + drawing_file._get_unqualified_reference() + ']'
+        drawing_val = _to_pdf_file_value(getattr(self, 'file', None), 'drawing_image')
+        if drawing_val:
+            fields['drawing_image'] = drawing_val
         return fields
 
 
@@ -718,9 +717,9 @@ class LocateReport(DAObject):
             'site_visit_date': format_date(self.site_visit_date) if hasattr(self, 'site_visit_date') else '',
             'site_address': getattr(self, 'site_address', ''),
         }
-        cover = _extract_file(getattr(self, 'cover_photo', None))
-        if cover:
-            fields['cover_photo'] = '[FILE ' + cover._get_unqualified_reference() + ']'
+        cover_val = _to_pdf_file_value(getattr(self, 'cover_photo', None), 'cover_photo')
+        if cover_val:
+            fields['cover_photo'] = cover_val
         return fields
     
     def get_report_fields(self):
@@ -873,6 +872,34 @@ def _extract_file(file_val):
             pass
         return None
     return file_val
+
+
+def _to_pdf_file_value(file_val, field_name):
+    """Return a PDF-friendly value for image fields.
+
+    Prefers Docassemble's [FILE ...] markup string (produced by str(DAFile)).
+    Falls back to returning the DAFile object if conversion fails.
+    """
+    file_obj = _extract_file(file_val)
+    if not file_obj:
+        # #region agent log
+        log(json.dumps({'location': 'objects.py:_to_pdf_file_value', 'message': 'empty file value', 'data': {'field': field_name}, 'hypothesisId': 'H-COVER-EMPTY'}))
+        # #endregion
+        return None
+    try:
+        rendered = str(file_obj)
+    except Exception as err:
+        # #region agent log
+        log(json.dumps({'location': 'objects.py:_to_pdf_file_value', 'message': 'str(file_obj) failed', 'data': {'field': field_name, 'error': str(err), 'type': type(file_obj).__name__}, 'hypothesisId': 'H-COVER-STR-FAIL'}))
+        # #endregion
+        return file_obj
+    is_file_markup = isinstance(rendered, str) and rendered.startswith('[FILE ')
+    # #region agent log
+    log(json.dumps({'location': 'objects.py:_to_pdf_file_value', 'message': 'converted file value', 'data': {'field': field_name, 'type': type(file_obj).__name__, 'is_file_markup': is_file_markup, 'rendered_preview': rendered[:80] if isinstance(rendered, str) else str(type(rendered).__name__)}, 'hypothesisId': 'H-COVER-CONVERT'}))
+    # #endregion
+    if is_file_markup:
+        return rendered
+    return file_obj
 
 
 HEADER_WIDTH = 18
