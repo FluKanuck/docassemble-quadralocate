@@ -735,6 +735,26 @@ This approach does zero DOM observation and zero DOM writes on mutation events, 
 
 ---
 
+### ISS-036 — PermissionError: debug.log in photo export instrumentation
+
+| Detail | Value |
+|--------|-------|
+| **Date opened** | 2026-02-11 |
+| **Date resolved** | 2026-02-11 |
+| **Status** | **RESOLVED** |
+| **Version** | 1.5.10 → 1.5.11 |
+| **Commits** | *(included in 1.5.11 commit)* |
+
+**Symptom:** When running the photo export debug instrumentation, Docassemble raised `PermissionError: [Errno 13] Permission denied: 'q:\\QuadDoc\\.cursor\\debug.log'`. Docassemble runs in Docker (Linux); the Windows path does not exist there and the process cannot write to it.
+
+**What we tried:** N/A — root cause was clear.
+
+**What worked:** Replaced all file-based logging with Docassemble's built-in `log()` function from `docassemble.base.functions`. Log output now appears in the interview's Log tab in the Docassemble playground, which is accessible regardless of deployment environment.
+
+**Lesson learned:** When instrumenting Docassemble code for debugging, use `log()` — never hardcode filesystem paths. The server runs in a container/remote environment where local paths may not exist or be writable.
+
+---
+
 <!-- 
   ┌──────────────────────────────────────────────────────────────────┐
   │  TEMPLATE — Copy this block when adding a new issue.            │
