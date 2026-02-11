@@ -715,6 +715,26 @@ This approach does zero DOM observation and zero DOM writes on mutation events, 
 
 ---
 
+### ISS-035 — Syntax error: standalone script block invalid (ISS-034 incomplete)
+
+| Detail | Value |
+|--------|-------|
+| **Date opened** | 2026-02-11 |
+| **Date resolved** | 2026-02-11 |
+| **Status** | **RESOLVED** |
+| **Version** | 1.5.8 → 1.5.9 |
+| **Commits** | *(included in 1.5.9 commit)* |
+
+**Symptom:** After the ISS-034 fix (v1.5.8), the interview failed to load with error: *"No question type could be determined for this section"* on line 33 (the `script:` block). Docassemble does not allow standalone top-level `script:` blocks — they must be attached to a question, code block, or initial block.
+
+**What we tried:** N/A — syntax error was clear from the error message.
+
+**What worked:** Changed the standalone `script:` block into an `initial: True` code block with the `script:` modifier attached. The `initial: True` directive makes the code (and its script) run on every page load, which is exactly what we need for global JavaScript. Added a minimal `code: | pass` body since `initial:` blocks require a code section, even if it does nothing.
+
+**Lesson learned:** In Docassemble, `script:` is a **modifier** that attaches to a question or code block, not a standalone top-level block type. For global scripts that run on every page, use `initial: True` with `code:` (even if empty) and attach `script:` as a modifier.
+
+---
+
 <!-- 
   ┌──────────────────────────────────────────────────────────────────┐
   │  TEMPLATE — Copy this block when adding a new issue.            │

@@ -6,7 +6,7 @@ metadata:
   authors:
     - name: Quadra Utility Locating Ltd.
   revision_date: 2026-02-11
-  version: 1.5.8
+  version: 1.5.9
 ---
 modules:
   - docassemble.quadralocate.objects
@@ -31,6 +31,10 @@ features:
   progress bar: True
   question back button: True
 ---
+initial: True
+code: |
+  # Global JavaScript for time input handling (runs on every page load)
+  pass
 script: |
   <script>
     // Restrict time inputs to 15-minute increments (for Time on Site fields).
@@ -88,7 +92,7 @@ question: |
 subquestion: |
   Welcome to the Quadra Utility Locate Report system.
   
-  <small class="text-muted">Version 1.5.8</small>
+  <small class="text-muted">Version 1.5.9</small>
 field: report_action
 buttons:
   - Start New Report: new
