@@ -6,7 +6,7 @@ metadata:
   authors:
     - name: Quadra Utility Locating Ltd.
   revision_date: 2026-02-12
-  version: 1.6.4
+  version: 1.6.5
 ---
 modules:
   - docassemble.quadralocate.objects
@@ -232,7 +232,7 @@ question: |
 subquestion: |
   Welcome to the Quadra Utility Locate Report system.
   
-  <small class="text-muted">Version 1.6.4</small>
+  <small class="text-muted">Version 1.6.5</small>
 field: report_action
 buttons:
   - Start New Report: new
@@ -277,6 +277,84 @@ fields:
   - Site Visit Date: report.site_visit_date
     datatype: date
     default: ${ today() }
+script: |
+  <script>
+    // Ensure address autocomplete is bound on the Job Information page.
+    // (Docassemble can render this field as input or textarea depending on settings/theme.)
+    (function() {
+      function findSiteAddressField() {
+        // Prefer direct match by variable name
+        var $f = $('textarea[name="report.site_address"], input[name="report.site_address"]');
+        if ($f.length) return $f.first();
+        // Fallback: find by label text
+        var $label = $('label').filter(function() {
+          return ($(this).text() || '').trim().toLowerCase().startsWith('site address');
+        }).first();
+        if ($label.length) {
+          var forId = $label.attr('for');
+          if (forId) {
+            var $byId = $('#' + CSS.escape(forId));
+            if ($byId.length) return $byId.first();
+          }
+          var $near = $label.closest('.form-group, .row, .da-field-container').find('textarea,input').first();
+          if ($near.length) return $near;
+        }
+        // Last resort: any field name containing site_address
+        $f = $('textarea[name*="site_address"], input[name*="site_address"]');
+        return $f.length ? $f.first() : $();
+      }
+
+      function bindAutocomplete($input) {
+        if (!$input || !$input.length) return;
+        if ($input.data('addrAutocompleteBound')) return;
+        $input.data('addrAutocompleteBound', true);
+
+        var timer = null;
+        $input.on('input', function() {
+          var query = ($input.val() || '').trim();
+          clearTimeout(timer);
+          $input.parent().find('.addr-suggestions').remove();
+          if (query.length < 4) return;
+          timer = setTimeout(function() {
+            $.ajax({
+              url: url_action('address_suggest', { q: query }),
+              dataType: 'json',
+              success: function(results) {
+                $input.parent().find('.addr-suggestions').remove();
+                if (!results || results.length === 0) return;
+                if (!$input.parent().hasClass('addr-autocomplete')) {
+                  $input.wrap('<div class="addr-autocomplete"></div>');
+                }
+                var $drop = $('<div class="addr-suggestions"></div>');
+                results.forEach(function(label) {
+                  $drop.append($('<div></div>').text(label).on('mousedown', function(e) {
+                    e.preventDefault();
+                    $input.val(label);
+                    $drop.remove();
+                    $input.trigger('change');
+                  }));
+                });
+                $drop.append('<div class="addr-powered">Powered by OpenStreetMap</div>');
+                $input.parent().append($drop);
+                $drop.show();
+              }
+            });
+          }, 350);
+        });
+
+        $input.on('blur', function() {
+          setTimeout(function() { $input.parent().find('.addr-suggestions').remove(); }, 200);
+        });
+      }
+
+      // Bind now and also after a short delay (DOM timing in Docassemble can be tricky)
+      $(document).ready(function() {
+        var $input = findSiteAddressField();
+        bindAutocomplete($input);
+        setTimeout(function() { bindAutocomplete(findSiteAddressField()); }, 300);
+      });
+    })();
+  </script>
 section: job_info
 ---
 question: |
