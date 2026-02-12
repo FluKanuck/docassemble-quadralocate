@@ -6,7 +6,7 @@ metadata:
   authors:
     - name: Quadra Utility Locating Ltd.
   revision_date: 2026-02-12
-  version: 1.5.23
+  version: 1.5.24
 ---
 modules:
   - docassemble.quadralocate.objects
@@ -93,7 +93,7 @@ question: |
 subquestion: |
   Welcome to the Quadra Utility Locate Report system.
   
-  <small class="text-muted">Version 1.5.23</small>
+  <small class="text-muted">Version 1.5.24</small>
 field: report_action
 buttons:
   - Start New Report: new
@@ -1374,17 +1374,10 @@ code: |
   parts.append(DAStaticFile(filename='data/static/legend_page.pdf'))
   
   export_name = report.get_export_filename()
-  export_stem = export_name[:-4] if export_name.lower().endswith('.pdf') else export_name
   final_report = pdf_concatenate(*parts, filename=export_name)
-  # Ensure both DAFile metadata and HTTP response headers carry the desired
-  # download name; some browsers otherwise fall back to generic "file".
-  final_report.set_attributes(filename=export_stem, extension='pdf', mimetype='application/pdf')
-  response(
-    file=final_report,
-    filename=export_name,
-    content_type='application/pdf',
-    content_disposition='attachment'
-  )
+  # Keep response wiring simple and compatible across docassemble versions.
+  final_report.set_attributes(filename=export_name)
+  response(file=final_report, filename=export_name, content_type='application/pdf')
 ---
 # WARNING: revision_number increment is not atomic. If multiple users
 # trigger this event simultaneously, the count may be incorrect.

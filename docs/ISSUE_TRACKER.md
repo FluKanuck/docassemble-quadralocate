@@ -974,6 +974,27 @@ This keeps continuation pages consistent with existing indexed attachment patter
 
 ---
 
+### ISS-047 — Download regression: file-not-found after filename hardening attempt
+
+| Detail | Value |
+|--------|-------|
+| **Date opened** | 2026-02-12 |
+| **Date resolved** | *unresolved* |
+| **Status** | **TRIED** |
+| **Version** | 1.5.24 |
+| **Commits** | *(pending commit)* |
+
+**Symptom:** During testing after v1.5.23, clicking Download produced a file-not-found error instead of returning the generated PDF.
+
+**What we tried:**
+1. Traced the regression to the v1.5.23 download response hardening path that added `set_attributes(filename=<stem>, extension='pdf', mimetype='application/pdf')` and `content_disposition='attachment'` in `response(...)`.
+2. Reverted to the prior known-safe response pattern: `pdf_concatenate(..., filename=export_name)`, `final_report.set_attributes(filename=export_name)`, and `response(file=final_report, filename=export_name, content_type='application/pdf')`.
+3. Kept `get_export_filename()` fallback logic intact so export names remain non-empty.
+
+**What worked:** Pending user verification.
+
+---
+
 <!-- 
   ┌──────────────────────────────────────────────────────────────────┐
   │  TEMPLATE — Copy this block when adding a new issue.            │
