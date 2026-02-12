@@ -1058,6 +1058,27 @@ This keeps continuation pages consistent with existing indexed attachment patter
 
 ---
 
+### ISS-051 — Download name remains `file`; remove forced anchor and rely on DAFile attributes
+
+| Detail | Value |
+|--------|-------|
+| **Date opened** | 2026-02-12 |
+| **Date resolved** | *unresolved* |
+| **Status** | **TRIED** |
+| **Version** | 1.5.28 |
+| **Commits** | *(pending commit)* |
+
+**Symptom:** Export succeeds, but browser still saves as generic `file`. Previous attempt with an HTML `download=` anchor caused immediate auto-download behavior (no save dialog) without fixing the name.
+
+**What we tried:**
+1. Removed the custom anchor-with-`download` markup and restored `action_button_html(...)` for the download action to avoid forced auto-download UX.
+2. In `download_report`, set `final_report` attributes using explicit basename+extension (`set_attributes(filename=<stem>, extension='pdf')`) rather than passing a full `*.pdf` string as the filename attribute.
+3. Simplified the response call to `response(file=final_report, content_type='application/pdf')` so Docassemble serves the DAFile using its own metadata, instead of mixing response filename overrides that may collapse to `file`.
+
+**What worked:** Pending user verification.
+
+---
+
 <!-- 
   ┌──────────────────────────────────────────────────────────────────┐
   │  TEMPLATE — Copy this block when adding a new issue.            │

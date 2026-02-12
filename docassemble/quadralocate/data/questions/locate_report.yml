@@ -6,7 +6,7 @@ metadata:
   authors:
     - name: Quadra Utility Locating Ltd.
   revision_date: 2026-02-12
-  version: 1.5.27
+  version: 1.5.28
 ---
 modules:
   - docassemble.quadralocate.objects
@@ -93,7 +93,7 @@ question: |
 subquestion: |
   Welcome to the Quadra Utility Locate Report system.
   
-  <small class="text-muted">Version 1.5.27</small>
+  <small class="text-muted">Version 1.5.28</small>
 field: report_action
 buttons:
   - Start New Report: new
@@ -1272,9 +1272,7 @@ subquestion: |
   
   Download your report:
   
-  <a class="btn btn-primary btn-lg" href="${ url_action('download_report') }" download="${ report.get_export_filename() }">
-    <i class="fa fa-download"></i> Download PDF Report
-  </a>
+  ${ action_button_html(url_action('download_report'), label='Download PDF Report', icon='download', color='primary', size='lg') }
   
   ---
   
@@ -1376,10 +1374,11 @@ code: |
   parts.append(DAStaticFile(filename='data/static/legend_page.pdf'))
   
   export_name = report.get_export_filename()
+  export_stem = export_name[:-4] if export_name.lower().endswith('.pdf') else export_name
   final_report = pdf_concatenate(*parts, filename=export_name)
-  # Keep response wiring simple and compatible across docassemble versions.
-  final_report.set_attributes(filename=export_name)
-  response(file=final_report, filename=export_name, content_type='application/pdf')
+  # Set file object attributes explicitly and let docassemble serve the file.
+  final_report.set_attributes(filename=export_stem, extension='pdf')
+  response(file=final_report, content_type='application/pdf')
 ---
 # WARNING: revision_number increment is not atomic. If multiple users
 # trigger this event simultaneously, the count may be incorrect.
