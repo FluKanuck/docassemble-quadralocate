@@ -6,7 +6,7 @@ metadata:
   authors:
     - name: Quadra Utility Locating Ltd.
   revision_date: 2026-02-12
-  version: 1.6.2
+  version: 1.6.3
 ---
 modules:
   - docassemble.quadralocate.objects
@@ -94,9 +94,10 @@ script: |
         if (query.length < 4) return;
         _addrTimer = setTimeout(function() {
           $.ajax({
-            url: 'https://nominatim.openstreetmap.org/search',
-            data: { q: query, format: 'json', addressdetails: 1, limit: 6, countrycodes: 'ca', email: 'admin@quadra.com' },
-            headers: { 'Accept-Language': 'en' },
+            // Use same-origin endpoint to avoid browser CORS/CSP blocks.
+            url: "${ url_action('address_suggest') }",
+            dataType: 'json',
+            data: { q: query },
             success: function(results) {
               $input.parent().find('.addr-suggestions').remove();
               if (!results || results.length === 0) return;
@@ -106,7 +107,7 @@ script: |
               }
               var $drop = $('<div class="addr-suggestions"></div>');
               results.forEach(function(r) {
-                var label = r.display_name || '';
+                var label = (typeof r === 'string') ? r : (r.display_name || '');
                 $drop.append($('<div></div>').text(label).on('mousedown', function(e) {
                   e.preventDefault();
                   $input.val(label);
@@ -128,6 +129,65 @@ script: |
       });
     });
   </script>
+---
+event: address_suggest
+code: |
+  import os
+  import json
+  import requests
+  from docassemble.base.util import get_config
+
+  q = action_argument('q')
+  q = str(q or '').strip()
+  if len(q) < 3:
+    response(binaryresponse=b'[]', content_type='application/json')
+    return
+
+  contact_email = (
+    get_config('nominatim email')
+    or get_config('admin email')
+    or os.environ.get('NOMINATIM_EMAIL')
+    or os.environ.get('LETSENCRYPTEMAIL')
+    or 'admin@quadra.com'
+  )
+  user_agent = (
+    get_config('nominatim user agent')
+    or os.environ.get('NOMINATIM_USER_AGENT')
+    or f"QuadraLocate/1.0 ({contact_email})"
+  )
+  headers = {
+    'User-Agent': user_agent,
+    'Accept-Language': 'en',
+  }
+  params = {
+    'q': q,
+    'format': 'json',
+    'addressdetails': 1,
+    'limit': 6,
+    'countrycodes': 'ca',
+    'email': contact_email,
+  }
+  r = requests.get(
+    'https://nominatim.openstreetmap.org/search',
+    params=params,
+    headers=headers,
+    timeout=10,
+  )
+  if r.status_code != 200:
+    response(binaryresponse=b'[]', content_type='application/json')
+    return
+
+  # Return a small list of display strings (simpler client-side handling)
+  try:
+    raw = r.json()
+  except Exception:
+    raw = []
+  out = []
+  for item in (raw or []):
+    name = item.get('display_name') if isinstance(item, dict) else None
+    if name:
+      out.append(name)
+  response(binaryresponse=json.dumps(out).encode('utf-8'), content_type='application/json')
 ---
 sections:
   - introduction: Introduction
@@ -171,7 +231,7 @@ question: |
 subquestion: |
   Welcome to the Quadra Utility Locate Report system.
   
-  <small class="text-muted">Version 1.6.2</small>
+  <small class="text-muted">Version 1.6.3</small>
 field: report_action
 buttons:
   - Start New Report: new
