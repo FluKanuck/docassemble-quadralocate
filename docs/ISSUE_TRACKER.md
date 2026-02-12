@@ -1167,6 +1167,7 @@ This keeps continuation pages consistent with existing indexed attachment patter
 3. Autocomplete still not showing in browser: moved autocomplete to a same-origin `address_suggest` endpoint in `locate_report.yml` so the browser never calls Nominatim directly (avoids CORS/CSP issues). Client-side JS now calls `url_action('address_suggest')` and receives a simple list of strings.
 4. Root cause: `action_argument()` only reads arguments passed via Docassemble's action mechanism (arguments created by `url_action()`), not normal query-string params. Updated JS to call Docassemble's JavaScript `url_action('address_suggest', {q: query})` helper so `action_argument('q')` receives the typed query.
 5. Still no network request observed in DevTools on the Job Information screen: added a `script:` block directly to the Job Information question to bind autocomplete specifically to the rendered Site Address field (using label-based fallback), in case the global `initial: True` script was not being injected/run on that page.
+6. Autocomplete suggestions too verbose (full Nominatim `display_name` including neighborhoods, districts, postal codes). Updated `address_suggest` to format results as a clean street-level label, preferring `house_number + road + city`, and preserving the typed house number when Nominatim returns only a road.
 
 **What worked:** Pending user verification.
 

@@ -6,7 +6,7 @@ metadata:
   authors:
     - name: Quadra Utility Locating Ltd.
   revision_date: 2026-02-12
-  version: 1.6.5
+  version: 1.6.6
 ---
 modules:
   - docassemble.quadralocate.objects
@@ -137,6 +137,7 @@ code: |
   import os
   import json
   import requests
+  import re
   from docassemble.base.util import get_config
 
   q = action_argument('q')
@@ -144,6 +145,9 @@ code: |
   if len(q) < 3:
     response(binaryresponse=b'[]', content_type='application/json')
   else:
+    # Extract leading house number from user input (if any)
+    m = re.match(r'^\s*(\d{1,6})\s+(.*)$', q)
+    typed_house_number = m.group(1) if m else None
     contact_email = (
       get_config('nominatim email')
       or get_config('admin email')
@@ -177,16 +181,45 @@ code: |
     if r.status_code != 200:
       response(binaryresponse=b'[]', content_type='application/json')
     else:
-      # Return a small list of display strings (simpler client-side handling)
+      # Return a small list of *clean* address strings:
+      #   "3426 Terra Vita Place, Vancouver"
+      # Avoid neighborhood, regional district, postal codes, etc.
       try:
         raw = r.json()
       except Exception:
         raw = []
       out = []
       for item in (raw or []):
-        name = item.get('display_name') if isinstance(item, dict) else None
-        if name:
-          out.append(name)
+        if not isinstance(item, dict):
+          continue
+        addr = item.get('address') if isinstance(item.get('address'), dict) else {}
+        # Nominatim fields vary; these are common keys:
+        house_number = addr.get('house_number')
+        road = addr.get('road') or addr.get('pedestrian') or addr.get('footway') or addr.get('path')
+        city = addr.get('city') or addr.get('town') or addr.get('village') or addr.get('municipality') or addr.get('hamlet')
+
+        # Build "street" part
+        street = None
+        if road and (house_number or typed_house_number):
+          street = f\"{house_number or typed_house_number} {road}\".strip()
+        elif road:
+          street = str(road).strip()
+
+        # If we cannot construct a clean street+city, fall back to trimmed display_name
+        label = None
+        if street and city:
+          label = f\"{street}, {city}\".strip()
+        elif street:
+          label = street
+        else:
+          display_name = item.get('display_name')
+          if isinstance(display_name, str) and display_name.strip():
+            # Take only the first 2 comma-separated parts to reduce verbosity
+            parts = [p.strip() for p in display_name.split(',') if p.strip()]
+            label = ', '.join(parts[:2]) if parts else None
+
+        if label:
+          out.append(label)
       response(binaryresponse=json.dumps(out).encode('utf-8'), content_type='application/json')
 
 ---
@@ -232,7 +265,7 @@ question: |
 subquestion: |
   Welcome to the Quadra Utility Locate Report system.
   
-  <small class="text-muted">Version 1.6.5</small>
+  <small class="text-muted">Version 1.6.6</small>
 field: report_action
 buttons:
   - Start New Report: new
