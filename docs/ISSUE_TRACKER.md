@@ -1149,6 +1149,26 @@ This keeps continuation pages consistent with existing indexed attachment patter
 
 ---
 
+### ISS-055 — Nominatim geocoding blocked (403) + address autocomplete selector mismatch (v1.6.2)
+
+| Detail | Value |
+|--------|-------|
+| **Date opened** | 2026-02-12 |
+| **Date resolved** | *unresolved* |
+| **Status** | **TRIED** |
+| **Version** | 1.6.2 |
+| **Commits** | *(pending commit)* |
+
+**Symptom:** Tech reports that Site Address autocomplete still shows no suggestions (field renders as single-line input). Map sync creates no pins.
+
+**What we tried:**
+1. Found Site Address field renders as `input` in UI, but autocomplete JS only bound to `textarea`, so it never fired. Expanded selector to bind to both `input` and `textarea` variants of `site_address`.
+2. Tested Nominatim from inside the Docassemble container: direct requests without a compliant `User-Agent` are blocked with HTTP 403. Updated server-side geocoding (`JobMapService.geocode_address`) to call Nominatim via `requests` with a descriptive `User-Agent` and `email` parameter, per Nominatim usage policy.
+
+**What worked:** Pending user verification.
+
+---
+
 <!-- 
   ┌──────────────────────────────────────────────────────────────────┐
   │  TEMPLATE — Copy this block when adding a new issue.            │

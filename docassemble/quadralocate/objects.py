@@ -1422,8 +1422,9 @@ class JobMapService:
     def geocode_address(address_str):
         """Geocode an address string to (latitude, longitude).
 
-        Uses Nominatim (OpenStreetMap) via geopy. Free, no API key needed.
-        Rate limit: 1 request/second (enforced by geopy's default timeout).
+        Uses Nominatim (OpenStreetMap) directly via HTTPS with a compliant
+        User-Agent and contact email. Free, no API key needed.
+        Rate limit: 1 request/second (enforce in callers for batch sync).
 
         Args:
             address_str: The site address to geocode.
@@ -1432,18 +1433,59 @@ class JobMapService:
             (lat, lng) tuple, or (None, None) if geocoding fails.
         """
         try:
-            from geopy.geocoders import Nominatim
-            geolocator = Nominatim(user_agent='quadra-locate-report/1.0')
+            import requests
+            from docassemble.base.util import get_config
+
             # Clean up the address for better geocoding
-            clean_addr = address_str.replace('\n', ', ').replace('\r', ', ').strip()
+            clean_addr = (address_str or '').replace('\n', ', ').replace('\r', ', ').strip()
+            if not clean_addr:
+                return (None, None)
+
             # Append BC, Canada if not already present (most jobs are in BC)
-            if 'canada' not in clean_addr.lower() and 'bc' not in clean_addr.lower():
+            lower = clean_addr.lower()
+            if 'canada' not in lower and 'bc' not in lower:
                 clean_addr += ', BC, Canada'
-            location = geolocator.geocode(clean_addr, timeout=10)
-            if location:
-                return (location.latitude, location.longitude)
-            log.warning("JobMapService: geocoding returned no results for '%s'", clean_addr)
-            return (None, None)
+
+            # Nominatim usage policy: include a descriptive UA + contact email
+            contact_email = (
+                get_config('nominatim email')
+                or get_config('admin email')
+                or os.environ.get('NOMINATIM_EMAIL')
+                or os.environ.get('LETSENCRYPTEMAIL')
+                or 'admin@quadra.com'
+            )
+            user_agent = (
+                get_config('nominatim user agent')
+                or os.environ.get('NOMINATIM_USER_AGENT')
+                or f"QuadraLocate/1.0 ({contact_email})"
+            )
+
+            headers = {
+                'User-Agent': user_agent,
+                'Accept-Language': 'en',
+            }
+            params = {
+                'q': clean_addr,
+                'format': 'json',
+                'limit': 1,
+                'email': contact_email,
+            }
+            r = requests.get(
+                'https://nominatim.openstreetmap.org/search',
+                params=params,
+                headers=headers,
+                timeout=10,
+            )
+            if r.status_code != 200:
+                log.warning("JobMapService: nominatim status %s for '%s'", r.status_code, clean_addr)
+                return (None, None)
+            data = r.json() if r.text else []
+            if not data:
+                log.warning("JobMapService: geocoding returned no results for '%s'", clean_addr)
+                return (None, None)
+            lat = float(data[0].get('lat')) if data[0].get('lat') is not None else None
+            lng = float(data[0].get('lon')) if data[0].get('lon') is not None else None
+            return (lat, lng)
         except Exception as e:
             log.error("JobMapService: geocoding failed for '%s': %s", address_str, e)
             return (None, None)

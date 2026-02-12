@@ -6,7 +6,7 @@ metadata:
   authors:
     - name: Quadra Utility Locating Ltd.
   revision_date: 2026-02-12
-  version: 1.6.1
+  version: 1.6.2
 ---
 modules:
   - docassemble.quadralocate.objects
@@ -82,9 +82,10 @@ script: |
       });
 
       // ── Address autocomplete via Nominatim (OpenStreetMap) ──
-      // Targets any textarea whose DA field name contains "site_address".
+      // Targets Site Address field whether rendered as input or textarea.
       var _addrTimer = null;
-      $(document).on('input', 'textarea[alt="Site Address"], textarea[name*="site_address"]', function() {
+      var _addrSelector = 'input[name*=\"site_address\"], textarea[name*=\"site_address\"], input[aria-label=\"Site Address\"], textarea[aria-label=\"Site Address\"]';
+      $(document).on('input', _addrSelector, function() {
         var $input = $(this);
         var query = $input.val().trim();
         clearTimeout(_addrTimer);
@@ -94,7 +95,7 @@ script: |
         _addrTimer = setTimeout(function() {
           $.ajax({
             url: 'https://nominatim.openstreetmap.org/search',
-            data: { q: query, format: 'json', addressdetails: 1, limit: 6, countrycodes: 'ca' },
+            data: { q: query, format: 'json', addressdetails: 1, limit: 6, countrycodes: 'ca', email: 'admin@quadra.com' },
             headers: { 'Accept-Language': 'en' },
             success: function(results) {
               $input.parent().find('.addr-suggestions').remove();
@@ -121,7 +122,7 @@ script: |
         }, 350); // debounce 350ms to respect Nominatim rate limit
       });
       // Hide dropdown on blur (with small delay for click to register)
-      $(document).on('blur', 'textarea[alt="Site Address"], textarea[name*="site_address"]', function() {
+      $(document).on('blur', _addrSelector, function() {
         var $input = $(this);
         setTimeout(function() { $input.parent().find('.addr-suggestions').remove(); }, 200);
       });
@@ -170,7 +171,7 @@ question: |
 subquestion: |
   Welcome to the Quadra Utility Locate Report system.
   
-  <small class="text-muted">Version 1.6.1</small>
+  <small class="text-muted">Version 1.6.2</small>
 field: report_action
 buttons:
   - Start New Report: new
