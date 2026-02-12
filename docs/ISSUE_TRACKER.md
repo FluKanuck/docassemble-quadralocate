@@ -1016,6 +1016,27 @@ This keeps continuation pages consistent with existing indexed attachment patter
 
 ---
 
+### ISS-049 — Utility missing-doc phrasing customization (municipal per-utility + telecom wording)
+
+| Detail | Value |
+|--------|-------|
+| **Date opened** | 2026-02-12 |
+| **Date resolved** | *unresolved* |
+| **Status** | **TRIED** |
+| **Version** | 1.5.26 |
+| **Commits** | *(pending commit)* |
+
+**Symptom:** User requested generated utility-level missing-doc text refinements: municipal should be broken down by utility section (not generic municipal phrasing), and communications should read "No BC1 Call information available from Telecommunication providers at the time the utility locate was performed."
+
+**What we tried:**
+1. Added utility-specific label overrides for utility-level missing-doc sentence generation so municipal maps to section-specific wording: Water -> `Water`, Storm -> `Storm`, Sanitary -> `Sanitary`.
+2. Added a communications-specific sentence branch that emits the exact requested phrase using `from Telecommunication providers`.
+3. Kept recommendation-level missing-doc list behavior unchanged to avoid regressing prior recommendation output logic.
+
+**What worked:** Implemented and lint-clean; pending your wording confirmation in generated output.
+
+---
+
 <!-- 
   ┌──────────────────────────────────────────────────────────────────┐
   │  TEMPLATE — Copy this block when adding a new issue.            │

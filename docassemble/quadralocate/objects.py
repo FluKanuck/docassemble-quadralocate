@@ -519,6 +519,20 @@ class LocateReport(DAObject):
         'storm': ['municipal'],
         'sanitary': ['municipal'],
     }
+    MISSING_DOC_UTILITY_LABEL_OVERRIDES = {
+        'communications': {
+            'comm': 'Telecommunication providers',
+        },
+        'water': {
+            'municipal': 'Water',
+        },
+        'storm': {
+            'municipal': 'Storm',
+        },
+        'sanitary': {
+            'municipal': 'Sanitary',
+        },
+    }
     
     def init(self, *pargs, **kwargs):
         super().init(*pargs, **kwargs)
@@ -571,9 +585,10 @@ class LocateReport(DAObject):
     def get_missing_doc_labels_for_utility(self, utility_key):
         """Return selected missing-doc labels mapped to a utility section."""
         labels = []
+        utility_overrides = self.MISSING_DOC_UTILITY_LABEL_OVERRIDES.get(utility_key, {})
         for doc_key in self.MISSING_DOC_UTILITY_MAP.get(utility_key, []):
             if self.missing_docs.get(doc_key, False):
-                label = self.MISSING_DOC_LABELS.get(doc_key, doc_key)
+                label = utility_overrides.get(doc_key, self.MISSING_DOC_LABELS.get(doc_key, doc_key))
                 labels.append(label)
         return labels
 
@@ -582,6 +597,11 @@ class LocateReport(DAObject):
         labels = self.get_missing_doc_labels_for_utility(utility_key)
         if not labels:
             return ""
+        if utility_key == 'communications' and labels == ['Telecommunication providers']:
+            return (
+                "No BC1 Call information available from Telecommunication providers "
+                "at the time the utility locate was performed."
+            )
         utility_list = oxford_join(labels)
         return (
             f"No BC1 Call information available for {utility_list} at the time "
