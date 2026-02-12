@@ -597,6 +597,17 @@ class LocateReport(DAObject):
         labels = self.get_missing_doc_labels_for_utility(utility_key)
         if not labels:
             return ""
+        if utility_key in ['water', 'storm', 'sanitary'] and self.missing_docs.get('municipal', False):
+            utility_label_map = {
+                'water': 'Water',
+                'storm': 'Storm',
+                'sanitary': 'Sanitary',
+            }
+            utility_label = utility_label_map.get(utility_key, utility_key.title())
+            return (
+                f"No municipal GIS information for {utility_label} available at the time "
+                "the utility locate was performed."
+            )
         if utility_key == 'communications' and labels == ['Telecommunication providers']:
             return (
                 "No BC1 Call information available from Telecommunication providers "

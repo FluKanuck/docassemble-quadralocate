@@ -1037,6 +1037,27 @@ This keeps continuation pages consistent with existing indexed attachment patter
 
 ---
 
+### ISS-050 — Municipal utility sentence wording changed to municipal GIS phrasing
+
+| Detail | Value |
+|--------|-------|
+| **Date opened** | 2026-02-12 |
+| **Date resolved** | *unresolved* |
+| **Status** | **TRIED** |
+| **Version** | 1.5.27 |
+| **Commits** | *(pending commit)* |
+
+**Symptom:** User requested another municipal wording update: utility-level output should read "No municipal GIS information for *utility* available at the time the utility locate was performed."
+
+**What we tried:**
+1. Updated utility-level sentence generation in `format_utility_missing_docs_sentence()` with a municipal-specific branch for `water`, `storm`, and `sanitary`.
+2. Added explicit utility label mapping in that branch so each section renders its own utility name in the sentence.
+3. Kept communications custom wording and recommendation-level missing-doc sentence behavior unchanged.
+
+**What worked:** Implemented and lint-clean; pending user confirmation in generated output.
+
+---
+
 <!-- 
   ┌──────────────────────────────────────────────────────────────────┐
   │  TEMPLATE — Copy this block when adding a new issue.            │
