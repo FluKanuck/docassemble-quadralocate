@@ -890,6 +890,27 @@ This keeps continuation pages consistent with existing indexed attachment patter
 
 ---
 
+### ISS-043 — Download dialog suggests generic filename `file`
+
+| Detail | Value |
+|--------|-------|
+| **Date opened** | 2026-02-12 |
+| **Date resolved** | 2026-02-12 |
+| **Status** | **RESOLVED** |
+| **Version** | 1.5.21 |
+| **Commits** | *(pending commit)* |
+
+**Symptom:** Clicking **Download PDF Report** presents a save dialog with a generic filename like `file` instead of the expected exported report name.
+
+**What we tried:**
+1. Added a defensive fallback in `LocateReport.get_export_filename()` so it always returns a non-empty name ending with `.pdf` (`date` or `locate-report` fallback).
+2. In `download_report`, set filename metadata directly on the concatenated DAFile via `final_report.set_attributes(filename=export_name)` before calling `response(...)`.
+3. Kept explicit `filename=export_name` in both `pdf_concatenate()` and `response()` for compatibility.
+
+**What worked:** User confirmed the download prompt now uses a proper report filename (not generic `file`) after applying filename fallback + DAFile attribute stamping + explicit response filename wiring.
+
+---
+
 <!-- 
   ┌──────────────────────────────────────────────────────────────────┐
   │  TEMPLATE — Copy this block when adding a new issue.            │

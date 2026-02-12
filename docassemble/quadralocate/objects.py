@@ -821,6 +821,9 @@ class LocateReport(DAObject):
         filename = re.sub(r'[<>:"/\\|?*]', '', filename)
         # Collapse multiple spaces
         filename = re.sub(r'\s+', ' ', filename).strip()
+        # Ensure filename is never empty; empty names can collapse to generic "file".
+        if not filename:
+            filename = date_str or 'locate-report'
         return filename + '.pdf'
 
 
