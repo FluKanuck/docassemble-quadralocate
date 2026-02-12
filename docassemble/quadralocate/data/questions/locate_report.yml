@@ -6,7 +6,7 @@ metadata:
   authors:
     - name: Quadra Utility Locating Ltd.
   revision_date: 2026-02-12
-  version: 1.6.3
+  version: 1.6.4
 ---
 modules:
   - docassemble.quadralocate.objects
@@ -95,9 +95,11 @@ script: |
         _addrTimer = setTimeout(function() {
           $.ajax({
             // Use same-origin endpoint to avoid browser CORS/CSP blocks.
-            url: "${ url_action('address_suggest') }",
+            // IMPORTANT: action_argument() only reads Docassemble action arguments.
+            // So we must generate the URL using Docassemble's *JavaScript* url_action()
+            // helper, passing {q: query} as action arguments.
+            url: url_action('address_suggest', { q: query }),
             dataType: 'json',
-            data: { q: query },
             success: function(results) {
               $input.parent().find('.addr-suggestions').remove();
               if (!results || results.length === 0) return;
@@ -230,7 +232,7 @@ question: |
 subquestion: |
   Welcome to the Quadra Utility Locate Report system.
   
-  <small class="text-muted">Version 1.6.3</small>
+  <small class="text-muted">Version 1.6.4</small>
 field: report_action
 buttons:
   - Start New Report: new

@@ -1156,7 +1156,7 @@ This keeps continuation pages consistent with existing indexed attachment patter
 | **Date opened** | 2026-02-12 |
 | **Date resolved** | *unresolved* |
 | **Status** | **TRIED** |
-| **Version** | 1.6.3 |
+| **Version** | 1.6.4 |
 | **Commits** | *(pending commit)* |
 
 **Symptom:** Tech reports that Site Address autocomplete still shows no suggestions (field renders as single-line input). Map sync creates no pins.
@@ -1165,6 +1165,7 @@ This keeps continuation pages consistent with existing indexed attachment patter
 1. Found Site Address field renders as `input` in UI, but autocomplete JS only bound to `textarea`, so it never fired. Expanded selector to bind to both `input` and `textarea` variants of `site_address`.
 2. Tested Nominatim from inside the Docassemble container: direct requests without a compliant `User-Agent` are blocked with HTTP 403. Updated server-side geocoding (`JobMapService.geocode_address`) to call Nominatim via `requests` with a descriptive `User-Agent` and `email` parameter, per Nominatim usage policy.
 3. Autocomplete still not showing in browser: moved autocomplete to a same-origin `address_suggest` endpoint in `locate_report.yml` so the browser never calls Nominatim directly (avoids CORS/CSP issues). Client-side JS now calls `url_action('address_suggest')` and receives a simple list of strings.
+4. Root cause: `action_argument()` only reads arguments passed via Docassemble's action mechanism (arguments created by `url_action()`), not normal query-string params. Updated JS to call Docassemble's JavaScript `url_action('address_suggest', {q: query})` helper so `action_argument('q')` receives the typed query.
 
 **What worked:** Pending user verification.
 
