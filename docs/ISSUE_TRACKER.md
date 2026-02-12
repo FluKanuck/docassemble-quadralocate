@@ -995,6 +995,27 @@ This keeps continuation pages consistent with existing indexed attachment patter
 
 ---
 
+### ISS-048 — Download still saved as generic `file` despite working export
+
+| Detail | Value |
+|--------|-------|
+| **Date opened** | 2026-02-12 |
+| **Date resolved** | *unresolved* |
+| **Status** | **TRIED** |
+| **Version** | 1.5.25 |
+| **Commits** | *(pending commit)* |
+
+**Symptom:** Download now succeeds (no file-not-found), but browser save dialog still suggests generic `file` instead of report filename.
+
+**What we tried:**
+1. Kept the v1.5.24 safe server path in `download_report` (`pdf_concatenate` + `set_attributes(filename=export_name)` + `response(... filename=export_name ...)`) to avoid reintroducing file-not-found.
+2. Updated the review-screen download control from `action_button_html(...)` to explicit HTML anchor markup with `download="${ report.get_export_filename() }"` so the browser receives a client-side filename hint even if response headers are ignored in action flow.
+3. Left edit/new report action buttons unchanged.
+
+**What worked:** Pending user verification.
+
+---
+
 <!-- 
   ┌──────────────────────────────────────────────────────────────────┐
   │  TEMPLATE — Copy this block when adding a new issue.            │

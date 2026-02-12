@@ -6,7 +6,7 @@ metadata:
   authors:
     - name: Quadra Utility Locating Ltd.
   revision_date: 2026-02-12
-  version: 1.5.24
+  version: 1.5.25
 ---
 modules:
   - docassemble.quadralocate.objects
@@ -93,7 +93,7 @@ question: |
 subquestion: |
   Welcome to the Quadra Utility Locate Report system.
   
-  <small class="text-muted">Version 1.5.24</small>
+  <small class="text-muted">Version 1.5.25</small>
 field: report_action
 buttons:
   - Start New Report: new
@@ -1272,7 +1272,9 @@ subquestion: |
   
   Download your report:
   
-  ${ action_button_html(url_action('download_report'), label='Download PDF Report', icon='download', color='primary', size='lg') }
+  <a class="btn btn-primary btn-lg" href="${ url_action('download_report') }" download="${ report.get_export_filename() }">
+    <i class="fa fa-download"></i> Download PDF Report
+  </a>
   
   ---
   
