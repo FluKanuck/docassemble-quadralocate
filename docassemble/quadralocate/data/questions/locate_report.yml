@@ -141,53 +141,52 @@ code: |
   q = str(q or '').strip()
   if len(q) < 3:
     response(binaryresponse=b'[]', content_type='application/json')
-    return
+  else:
+    contact_email = (
+      get_config('nominatim email')
+      or get_config('admin email')
+      or os.environ.get('NOMINATIM_EMAIL')
+      or os.environ.get('LETSENCRYPTEMAIL')
+      or 'admin@quadra.com'
+    )
+    user_agent = (
+      get_config('nominatim user agent')
+      or os.environ.get('NOMINATIM_USER_AGENT')
+      or f"QuadraLocate/1.0 ({contact_email})"
+    )
+    headers = {
+      'User-Agent': user_agent,
+      'Accept-Language': 'en',
+    }
+    params = {
+      'q': q,
+      'format': 'json',
+      'addressdetails': 1,
+      'limit': 6,
+      'countrycodes': 'ca',
+      'email': contact_email,
+    }
+    r = requests.get(
+      'https://nominatim.openstreetmap.org/search',
+      params=params,
+      headers=headers,
+      timeout=10,
+    )
+    if r.status_code != 200:
+      response(binaryresponse=b'[]', content_type='application/json')
+    else:
+      # Return a small list of display strings (simpler client-side handling)
+      try:
+        raw = r.json()
+      except Exception:
+        raw = []
+      out = []
+      for item in (raw or []):
+        name = item.get('display_name') if isinstance(item, dict) else None
+        if name:
+          out.append(name)
+      response(binaryresponse=json.dumps(out).encode('utf-8'), content_type='application/json')
 
-  contact_email = (
-    get_config('nominatim email')
-    or get_config('admin email')
-    or os.environ.get('NOMINATIM_EMAIL')
-    or os.environ.get('LETSENCRYPTEMAIL')
-    or 'admin@quadra.com'
-  )
-  user_agent = (
-    get_config('nominatim user agent')
-    or os.environ.get('NOMINATIM_USER_AGENT')
-    or f"QuadraLocate/1.0 ({contact_email})"
-  )
-  headers = {
-    'User-Agent': user_agent,
-    'Accept-Language': 'en',
-  }
-  params = {
-    'q': q,
-    'format': 'json',
-    'addressdetails': 1,
-    'limit': 6,
-    'countrycodes': 'ca',
-    'email': contact_email,
-  }
-  r = requests.get(
-    'https://nominatim.openstreetmap.org/search',
-    params=params,
-    headers=headers,
-    timeout=10,
-  )
-  if r.status_code != 200:
-    response(binaryresponse=b'[]', content_type='application/json')
-    return
-
-  # Return a small list of display strings (simpler client-side handling)
-  try:
-    raw = r.json()
-  except Exception:
-    raw = []
-  out = []
-  for item in (raw or []):
-    name = item.get('display_name') if isinstance(item, dict) else None
-    if name:
-      out.append(name)
-  response(binaryresponse=json.dumps(out).encode('utf-8'), content_type='application/json')
 ---
 sections:
   - introduction: Introduction
