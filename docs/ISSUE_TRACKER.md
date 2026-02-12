@@ -870,6 +870,26 @@ This keeps continuation pages consistent with existing indexed attachment patter
 
 ---
 
+### ISS-042 — Legacy continuation variable lookup persists after ISS-041
+
+| Detail | Value |
+|--------|-------|
+| **Date opened** | 2026-02-11 |
+| **Date resolved** | 2026-02-11 |
+| **Status** | **RESOLVED** |
+| **Version** | 1.5.20 |
+| **Commits** | *(pending commit)* |
+
+**Symptom:** Even after ISS-041, overflow export still threw: *"reference to variable `report_cont_page_pdf` could not be looked up."*
+
+**What we tried:**
+1. Verified current YAML used the new scoped continuation variable (`report.cont_pages[i].filled_pdf`) and that download/edit logic referenced it correctly.
+2. Determined active sessions may still reference the legacy continuation variable name from pre-1.5.19 interview state.
+
+**What worked:** Added a backward-compatible attachment alias that explicitly defines `report_cont_page_pdf[i]` with the same continuation template fields. This allows both legacy and new variable paths to resolve during overflow export while session state transitions to the scoped pattern.
+
+---
+
 <!-- 
   ┌──────────────────────────────────────────────────────────────────┐
   │  TEMPLATE — Copy this block when adding a new issue.            │

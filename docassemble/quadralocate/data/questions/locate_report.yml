@@ -6,7 +6,7 @@ metadata:
   authors:
     - name: Quadra Utility Locating Ltd.
   revision_date: 2026-02-11
-  version: 1.5.19
+  version: 1.5.20
 ---
 modules:
   - docassemble.quadralocate.objects
@@ -93,7 +93,7 @@ question: |
 subquestion: |
   Welcome to the Quadra Utility Locate Report system.
   
-  <small class="text-muted">Version 1.5.19</small>
+  <small class="text-muted">Version 1.5.20</small>
 field: report_action
 buttons:
   - Start New Report: new
@@ -1304,6 +1304,15 @@ attachment:
   variable name: report.cont_pages[i].filled_pdf
   name: Report Continuation ${ i + 1 }
   filename: report_cont_${ i + 1 }
+  pdf template file: report_page_cont.pdf
+  code: report.get_report_cont_fields(i)
+---
+# Backward-compatibility alias for legacy sessions that still reference
+# report_cont_page_pdf[i] from pre-1.5.19 interview state.
+attachment:
+  variable name: report_cont_page_pdf[i]
+  name: Report Continuation Legacy ${ i + 1 }
+  filename: report_cont_legacy_${ i + 1 }
   pdf template file: report_page_cont.pdf
   code: report.get_report_cont_fields(i)
 ---
