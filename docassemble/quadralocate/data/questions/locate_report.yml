@@ -6,7 +6,7 @@ metadata:
   authors:
     - name: Quadra Utility Locating Ltd.
   revision_date: 2026-02-12
-  version: 1.6.6
+  version: 1.6.7
 ---
 modules:
   - docassemble.quadralocate.objects
@@ -201,14 +201,14 @@ code: |
         # Build "street" part
         street = None
         if road and (house_number or typed_house_number):
-          street = f\"{house_number or typed_house_number} {road}\".strip()
+          street = f"{house_number or typed_house_number} {road}".strip()
         elif road:
           street = str(road).strip()
 
         # If we cannot construct a clean street+city, fall back to trimmed display_name
         label = None
         if street and city:
-          label = f\"{street}, {city}\".strip()
+          label = f"{street}, {city}".strip()
         elif street:
           label = street
         else:
@@ -265,7 +265,7 @@ question: |
 subquestion: |
   Welcome to the Quadra Utility Locate Report system.
   
-  <small class="text-muted">Version 1.6.6</small>
+  <small class="text-muted">Version 1.6.7</small>
 field: report_action
 buttons:
   - Start New Report: new

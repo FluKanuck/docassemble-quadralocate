@@ -1156,7 +1156,7 @@ This keeps continuation pages consistent with existing indexed attachment patter
 | **Date opened** | 2026-02-12 |
 | **Date resolved** | *unresolved* |
 | **Status** | **TRIED** |
-| **Version** | 1.6.5 |
+| **Version** | 1.6.7 |
 | **Commits** | *(pending commit)* |
 
 **Symptom:** Tech reports that Site Address autocomplete still shows no suggestions (field renders as single-line input). Map sync creates no pins.
@@ -1168,6 +1168,7 @@ This keeps continuation pages consistent with existing indexed attachment patter
 4. Root cause: `action_argument()` only reads arguments passed via Docassemble's action mechanism (arguments created by `url_action()`), not normal query-string params. Updated JS to call Docassemble's JavaScript `url_action('address_suggest', {q: query})` helper so `action_argument('q')` receives the typed query.
 5. Still no network request observed in DevTools on the Job Information screen: added a `script:` block directly to the Job Information question to bind autocomplete specifically to the rendered Site Address field (using label-based fallback), in case the global `initial: True` script was not being injected/run on that page.
 6. Autocomplete suggestions too verbose (full Nominatim `display_name` including neighborhoods, districts, postal codes). Updated `address_suggest` to format results as a clean street-level label, preferring `house_number + road + city`, and preserving the typed house number when Nominatim returns only a road.
+7. Hotfix: `address_suggest` formatting introduced invalid Python escapes (`f\\\"...\\\"`) causing SyntaxError. Replaced with proper f-strings (`f\\\"...\\\"` → `f\"...\"` without backslashes) and bumped patch version.
 
 **What worked:** Pending user verification.
 
