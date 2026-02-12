@@ -845,6 +845,31 @@ See `docs/PHOTO_PDF_TEMPLATE.md` for step-by-step template update instructions.
 
 ---
 
+### ISS-041 — Continuation-page lookup crash (`report_cont_page_pdf` undefined)
+
+| Detail | Value |
+|--------|-------|
+| **Date opened** | 2026-02-11 |
+| **Date resolved** | 2026-02-11 |
+| **Status** | **RESOLVED** |
+| **Version** | 1.5.19 |
+| **Commits** | *(pending commit)* |
+
+**Symptom:** When report content overflowed to continuation pages, export failed with: *"reference to variable `report_cont_page_pdf` that could not be looked up."*
+
+**What we tried:**
+1. Reproduced the failing path and confirmed overflow logic reached the continuation attachment loop.
+2. Traced variable resolution: continuation attachment used a bare indexed variable name (`report_cont_page_pdf[i]`) instead of a report-scoped object path pattern used elsewhere (e.g., `report.photo_pages[i].filled_pdf`).
+
+**What worked:** Changed continuation attachment to a report-scoped DAList pattern:
+1. Added `report.cont_pages: DAList.using(object_type=DAObject, auto_gather=False)` in `objects`.
+2. Changed attachment variable to `report.cont_pages[i].filled_pdf`.
+3. Updated download and edit cache invalidation paths to use `report.cont_pages[idx].filled_pdf`.
+
+This keeps continuation pages consistent with existing indexed attachment patterns and resolves lookup failures when overflow occurs.
+
+---
+
 <!-- 
   ┌──────────────────────────────────────────────────────────────────┐
   │  TEMPLATE — Copy this block when adding a new issue.            │

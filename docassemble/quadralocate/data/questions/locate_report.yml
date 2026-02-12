@@ -6,7 +6,7 @@ metadata:
   authors:
     - name: Quadra Utility Locating Ltd.
   revision_date: 2026-02-11
-  version: 1.5.18
+  version: 1.5.19
 ---
 modules:
   - docassemble.quadralocate.objects
@@ -15,6 +15,7 @@ objects:
   - report: LocateReport
   - report.time_entries: DAList.using(object_type=TimeEntry, minimum_number=1)
   - report.photo_pages: DAList.using(object_type=PhotoPage, auto_gather=False)
+  - report.cont_pages: DAList.using(object_type=DAObject, auto_gather=False)
   - report.drawings: DAList.using(object_type=Drawing, auto_gather=False)
   # Utilities declared here so each has intrinsic name report.utilities.<key> (avoids rgekpcZRCyeu.methods['em'] lookup errors)
   - report.utilities.electrical: UtilityType
@@ -92,7 +93,7 @@ question: |
 subquestion: |
   Welcome to the Quadra Utility Locate Report system.
   
-  <small class="text-muted">Version 1.5.18</small>
+  <small class="text-muted">Version 1.5.19</small>
 field: report_action
 buttons:
   - Start New Report: new
@@ -1300,7 +1301,7 @@ attachment:
 ---
 # Report continuation pages (indexed; added only when overflow exists)
 attachment:
-  variable name: report_cont_page_pdf[i]
+  variable name: report.cont_pages[i].filled_pdf
   name: Report Continuation ${ i + 1 }
   filename: report_cont_${ i + 1 }
   pdf template file: report_page_cont.pdf
@@ -1341,7 +1342,7 @@ code: |
 
   # Report continuation pages (overflow from combined report, then billing details)
   for idx in range(len(report.get_report_cont_pages())):
-    parts.append(report_cont_page_pdf[idx].pdf)
+    parts.append(report.cont_pages[idx].filled_pdf.pdf)
   
   # Photo pages — only include pages that have at least one photo
   for idx, page in enumerate(report.photo_pages):
@@ -1378,7 +1379,7 @@ code: |
     undefine('report_pdf')
   # Indexed report continuation PDFs
   for _idx in range(len(report.get_report_cont_pages())):
-    _attr = 'report_cont_page_pdf[' + str(_idx) + ']'
+    _attr = 'report.cont_pages[' + str(_idx) + '].filled_pdf'
     if defined(_attr):
       undefine(_attr)
   # Indexed photo page PDFs
