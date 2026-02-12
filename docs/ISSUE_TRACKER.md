@@ -1100,6 +1100,32 @@ This keeps continuation pages consistent with existing indexed attachment patter
 
 ---
 
+### ISS-053 — Tech Dashboard, Dropbox integration, Job Map, and PDF archival (v1.6.0)
+
+| Detail | Value |
+|--------|-------|
+| **Date opened** | 2026-02-12 |
+| **Date resolved** | *unresolved* |
+| **Status** | **TRIED** |
+| **Version** | 1.6.0 |
+| **Commits** | *(pending commit)* |
+
+**Symptom:** Feature request — technicians need a dashboard to manage interviews, Dropbox integration for PDF export, and an interactive job map with geocoded pins.
+
+**What we tried:**
+1. Created `dashboard.yml` — tech landing page showing in-progress and completed reports. Uses `interview_list()` to fetch sessions; parses subtitle for metadata. Sessions tagged 'completed' via `session_tags()` at finalization.
+2. Added `DropboxService` class in `objects.py` — OAuth2 flow for linking personal Dropbox; upload helper using refresh tokens stored in DAStore. Added 'Save to Dropbox' button on final screen.
+3. Added `ReportArchiver` class — saves finalized PDFs to server filesystem (`/usr/share/docassemble/files/reports/{job_number}.pdf`) for persistent access independent of sessions.
+4. Added `JobMapService` class — geocodes addresses via Nominatim (free), stores pins via `write_record()`. Duplicate job numbers update existing pin.
+5. Created `job_map.yml` — Leaflet.js map with OpenStreetMap tiles (free). Shows all job pins with search/filter. Clicking a pin shows job info + download link for archived PDF.
+6. Added session metadata to `locate_report.yml` initial block — subtitle encoded as "job_number | client | address | date" for dashboard parsing.
+7. PDF archival and map pin creation triggered automatically at report finalization (before final_screen).
+8. Added `dropbox` and `geopy` to `setup.py` dependencies.
+
+**What worked:** Pending user verification.
+
+---
+
 <!-- 
   ┌──────────────────────────────────────────────────────────────────┐
   │  TEMPLATE — Copy this block when adding a new issue.            │

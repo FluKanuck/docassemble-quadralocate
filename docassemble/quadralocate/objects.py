@@ -3,6 +3,11 @@ Custom Python objects for Quadra Utility Locate Report
 """
 from docassemble.base.util import DAObject, DAList, DADict, format_time, format_date
 from datetime import datetime, time
+import os
+import json
+import logging
+
+log = logging.getLogger(__name__)
 
 
 __all__ = [
@@ -19,6 +24,9 @@ __all__ = [
     'HoursDict',
     'time_15min_choices',
     'format_time_12hr',
+    'DropboxService',
+    'JobMapService',
+    'ReportArchiver',
 ]
 
 
@@ -1121,3 +1129,400 @@ def time_15min_choices():
             display = f"{display_hour}:{minute:02d} {ampm}"
             choices.append({display: value})
     return choices
+
+
+# ============================================================
+# PDF Archival — save finalized reports to server filesystem
+# ============================================================
+
+# Default archive directory inside the Docker container's persistent volume.
+# This path is inside the da-data volume and survives container restarts.
+REPORT_ARCHIVE_DIR = os.environ.get(
+    'QUADRA_REPORT_ARCHIVE_DIR',
+    '/usr/share/docassemble/files/reports'
+)
+
+
+class ReportArchiver:
+    """Save and serve finalized PDF reports from the server filesystem."""
+
+    @staticmethod
+    def ensure_archive_dir():
+        """Create the archive directory if it does not exist."""
+        os.makedirs(REPORT_ARCHIVE_DIR, exist_ok=True)
+
+    @staticmethod
+    def archive_pdf(pdf_file, job_number):
+        """Copy a generated PDF to the archive directory.
+
+        Args:
+            pdf_file: A Docassemble DAFile or file-like object with a .path() method.
+            job_number: The Quadra job number (used as the filename).
+
+        Returns:
+            The full path of the archived file, or None on failure.
+        """
+        import re
+        import shutil
+        try:
+            ReportArchiver.ensure_archive_dir()
+            # Sanitize job number for use as filename
+            safe_name = re.sub(r'[<>:"/\\|?*]', '', str(job_number)).strip()
+            if not safe_name:
+                safe_name = 'unknown'
+            dest = os.path.join(REPORT_ARCHIVE_DIR, safe_name + '.pdf')
+            # Get source path — works for DAFile objects
+            if hasattr(pdf_file, 'path'):
+                src = pdf_file.path()
+            elif isinstance(pdf_file, str):
+                src = pdf_file
+            else:
+                log.warning("ReportArchiver: cannot determine source path for %s", type(pdf_file))
+                return None
+            shutil.copy2(src, dest)
+            log.info("ReportArchiver: archived %s -> %s", src, dest)
+            return dest
+        except Exception as e:
+            log.error("ReportArchiver: failed to archive PDF for job %s: %s", job_number, e)
+            return None
+
+    @staticmethod
+    def get_archived_path(job_number):
+        """Return the full path of an archived PDF, or None if it doesn't exist."""
+        import re
+        safe_name = re.sub(r'[<>:"/\\|?*]', '', str(job_number)).strip()
+        if not safe_name:
+            return None
+        path = os.path.join(REPORT_ARCHIVE_DIR, safe_name + '.pdf')
+        return path if os.path.isfile(path) else None
+
+    @staticmethod
+    def list_archived():
+        """Return a list of (job_number, file_path) tuples for all archived PDFs."""
+        ReportArchiver.ensure_archive_dir()
+        results = []
+        for fname in os.listdir(REPORT_ARCHIVE_DIR):
+            if fname.lower().endswith('.pdf'):
+                job_num = fname[:-4]  # strip .pdf
+                results.append((job_num, os.path.join(REPORT_ARCHIVE_DIR, fname)))
+        return results
+
+
+# ============================================================
+# Dropbox Integration — OAuth2 + file upload
+# ============================================================
+
+class DropboxService:
+    """Manage Dropbox OAuth2 authentication and file uploads.
+
+    Tokens are stored per-user in Docassemble's DAStore (persistent
+    key-value storage that survives across sessions).
+
+    Configuration:
+        Set these in Docassemble config.yml or as environment variables:
+        - DROPBOX_APP_KEY: Your Dropbox app key
+        - DROPBOX_APP_SECRET: Your Dropbox app secret (for confidential apps)
+    """
+
+    STORE_KEY = 'dropbox_refresh_token'
+
+    @staticmethod
+    def _get_app_key():
+        """Get the Dropbox app key from config or environment."""
+        from docassemble.base.util import get_config
+        key = get_config('dropbox app key')
+        if not key:
+            key = os.environ.get('DROPBOX_APP_KEY', '')
+        return key or ''
+
+    @staticmethod
+    def _get_app_secret():
+        """Get the Dropbox app secret from config or environment."""
+        from docassemble.base.util import get_config
+        secret = get_config('dropbox app secret')
+        if not secret:
+            secret = os.environ.get('DROPBOX_APP_SECRET', '')
+        return secret or ''
+
+    @staticmethod
+    def is_configured():
+        """Check if Dropbox app credentials are configured."""
+        return bool(DropboxService._get_app_key())
+
+    @staticmethod
+    def get_auth_url(redirect_uri):
+        """Generate a Dropbox OAuth2 authorization URL.
+
+        Args:
+            redirect_uri: The callback URL that Dropbox will redirect to.
+
+        Returns:
+            (auth_url, csrf_token) tuple, or (None, None) if not configured.
+        """
+        try:
+            import dropbox
+        except ImportError:
+            log.error("DropboxService: dropbox package not installed")
+            return None, None
+
+        app_key = DropboxService._get_app_key()
+        app_secret = DropboxService._get_app_secret()
+        if not app_key:
+            return None, None
+
+        auth_flow = dropbox.DropboxOAuth2Flow(
+            consumer_key=app_key,
+            consumer_secret=app_secret,
+            redirect_uri=redirect_uri,
+            session={},  # We manage state ourselves
+            csrf_token_session_key='dropbox-auth-csrf-token',
+            token_access_type='offline',
+        )
+        auth_url = auth_flow.start()
+        csrf_token = auth_flow.session.get('dropbox-auth-csrf-token', '')
+        return auth_url, csrf_token
+
+    @staticmethod
+    def complete_auth(auth_code):
+        """Exchange an authorization code for a refresh token.
+
+        Args:
+            auth_code: The authorization code from Dropbox callback.
+
+        Returns:
+            True if authentication succeeded and token was stored, False otherwise.
+        """
+        try:
+            import dropbox
+        except ImportError:
+            log.error("DropboxService: dropbox package not installed")
+            return False
+
+        app_key = DropboxService._get_app_key()
+        app_secret = DropboxService._get_app_secret()
+        if not app_key:
+            return False
+
+        try:
+            from dropbox import DropboxOAuth2FlowNoRedirect
+            flow = DropboxOAuth2FlowNoRedirect(
+                consumer_key=app_key,
+                consumer_secret=app_secret,
+                token_access_type='offline',
+            )
+            result = flow.finish(auth_code)
+
+            # Store refresh token
+            from docassemble.base.util import DAStore
+            store = DAStore()
+            store.set(DropboxService.STORE_KEY, {
+                'refresh_token': result.refresh_token,
+                'account_id': result.account_id,
+            })
+            log.info("DropboxService: auth completed for account %s", result.account_id)
+            return True
+        except Exception as e:
+            log.error("DropboxService: auth failed: %s", e)
+            return False
+
+    @staticmethod
+    def is_linked():
+        """Check if the current user has a linked Dropbox account."""
+        try:
+            from docassemble.base.util import DAStore
+            store = DAStore()
+            data = store.get(DropboxService.STORE_KEY)
+            return bool(data and data.get('refresh_token'))
+        except Exception:
+            return False
+
+    @staticmethod
+    def unlink():
+        """Remove the stored Dropbox token for the current user."""
+        try:
+            from docassemble.base.util import DAStore
+            store = DAStore()
+            store.delete(DropboxService.STORE_KEY)
+            return True
+        except Exception as e:
+            log.error("DropboxService: unlink failed: %s", e)
+            return False
+
+    @staticmethod
+    def upload_file(local_path, dropbox_path):
+        """Upload a file to the user's Dropbox.
+
+        Args:
+            local_path: Path to the local file to upload.
+            dropbox_path: The destination path in Dropbox (e.g., '/Reports/report.pdf').
+
+        Returns:
+            True if upload succeeded, False otherwise.
+        """
+        try:
+            import dropbox
+        except ImportError:
+            log.error("DropboxService: dropbox package not installed")
+            return False
+
+        try:
+            from docassemble.base.util import DAStore
+            store = DAStore()
+            data = store.get(DropboxService.STORE_KEY)
+            if not data or not data.get('refresh_token'):
+                log.error("DropboxService: no refresh token stored")
+                return False
+
+            dbx = dropbox.Dropbox(
+                app_key=DropboxService._get_app_key(),
+                app_secret=DropboxService._get_app_secret(),
+                oauth2_refresh_token=data['refresh_token'],
+            )
+
+            # Get source file path
+            if hasattr(local_path, 'path'):
+                src = local_path.path()
+            elif isinstance(local_path, str):
+                src = local_path
+            else:
+                log.error("DropboxService: cannot determine file path from %s", type(local_path))
+                return False
+
+            # Ensure dropbox_path starts with /
+            if not dropbox_path.startswith('/'):
+                dropbox_path = '/' + dropbox_path
+
+            with open(src, 'rb') as f:
+                dbx.files_upload(
+                    f.read(),
+                    dropbox_path,
+                    mode=dropbox.files.WriteMode.overwrite,
+                )
+            log.info("DropboxService: uploaded %s to %s", src, dropbox_path)
+            return True
+        except Exception as e:
+            log.error("DropboxService: upload failed: %s", e)
+            return False
+
+
+# ============================================================
+# Job Map — geocoding + persistent pin storage
+# ============================================================
+
+class JobMapService:
+    """Manage geocoded job pins for the interactive map.
+
+    Uses Docassemble's write_record/read_records for persistent storage
+    and geopy's Nominatim geocoder (free, no API key needed).
+    """
+
+    RECORD_KEY = 'job_map_pins'
+
+    @staticmethod
+    def geocode_address(address_str):
+        """Geocode an address string to (latitude, longitude).
+
+        Uses Nominatim (OpenStreetMap) via geopy. Free, no API key needed.
+        Rate limit: 1 request/second (enforced by geopy's default timeout).
+
+        Args:
+            address_str: The site address to geocode.
+
+        Returns:
+            (lat, lng) tuple, or (None, None) if geocoding fails.
+        """
+        try:
+            from geopy.geocoders import Nominatim
+            geolocator = Nominatim(user_agent='quadra-locate-report/1.0')
+            # Clean up the address for better geocoding
+            clean_addr = address_str.replace('\n', ', ').replace('\r', ', ').strip()
+            # Append BC, Canada if not already present (most jobs are in BC)
+            if 'canada' not in clean_addr.lower() and 'bc' not in clean_addr.lower():
+                clean_addr += ', BC, Canada'
+            location = geolocator.geocode(clean_addr, timeout=10)
+            if location:
+                return (location.latitude, location.longitude)
+            log.warning("JobMapService: geocoding returned no results for '%s'", clean_addr)
+            return (None, None)
+        except Exception as e:
+            log.error("JobMapService: geocoding failed for '%s': %s", address_str, e)
+            return (None, None)
+
+    @staticmethod
+    def pin_exists(job_number):
+        """Check if a pin already exists for this job number."""
+        from docassemble.base.util import read_records
+        for _rid, data in read_records(JobMapService.RECORD_KEY).items():
+            if isinstance(data, dict) and data.get('job_number') == str(job_number):
+                return True
+        return False
+
+    @staticmethod
+    def save_job_pin(report):
+        """Geocode the report's address and save a map pin.
+
+        Only creates a new pin if the job number is unique.
+        Skips silently on geocoding failure.
+
+        Args:
+            report: A LocateReport object with quadra_job_number, site_address,
+                    client_company, and site_visit_date attributes.
+
+        Returns:
+            True if pin was saved, False otherwise.
+        """
+        from docassemble.base.util import write_record, read_records, delete_record, \
+            format_date as da_format_date
+
+        job_number = str(getattr(report, 'quadra_job_number', ''))
+        if not job_number:
+            return False
+
+        address = str(getattr(report, 'site_address', ''))
+        if not address:
+            return False
+
+        # Check for existing pin — update if found, create if new
+        existing_rid = None
+        for rid, data in read_records(JobMapService.RECORD_KEY).items():
+            if isinstance(data, dict) and data.get('job_number') == job_number:
+                existing_rid = rid
+                break
+
+        lat, lng = JobMapService.geocode_address(address)
+        if lat is None or lng is None:
+            log.warning("JobMapService: skipping pin for job %s (geocoding failed)", job_number)
+            return False
+
+        pin_data = {
+            'job_number': job_number,
+            'site_address': address.replace('\n', ', ').replace('\r', ', ').strip(),
+            'client_company': str(getattr(report, 'client_company', '')),
+            'site_visit_date': da_format_date(report.site_visit_date, format='yyyy-MM-dd') if hasattr(report, 'site_visit_date') else '',
+            'lat': lat,
+            'lng': lng,
+            'pdf_filename': job_number + '.pdf',
+            'created_at': datetime.now().isoformat(),
+        }
+
+        if existing_rid is not None:
+            delete_record(JobMapService.RECORD_KEY, existing_rid)
+
+        write_record(JobMapService.RECORD_KEY, pin_data)
+        log.info("JobMapService: saved pin for job %s at (%s, %s)", job_number, lat, lng)
+        return True
+
+    @staticmethod
+    def get_all_pins():
+        """Return all job map pins as a list of dicts.
+
+        Returns:
+            List of pin dicts with keys: job_number, site_address, client_company,
+            site_visit_date, lat, lng, pdf_filename.
+        """
+        from docassemble.base.util import read_records
+        pins = []
+        for _rid, data in read_records(JobMapService.RECORD_KEY).items():
+            if isinstance(data, dict) and data.get('lat') is not None:
+                pins.append(data)
+        return pins

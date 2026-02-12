@@ -6,7 +6,7 @@ metadata:
   authors:
     - name: Quadra Utility Locating Ltd.
   revision_date: 2026-02-12
-  version: 1.5.29
+  version: 1.6.0
 ---
 modules:
   - docassemble.quadralocate.objects
@@ -85,15 +85,28 @@ code: |
 ---
 initial: True
 code: |
-  # Set session management for multi-day/multi-user
-  set_parts(subtitle=str(report.quadra_job_number) if defined('report.quadra_job_number') else 'New Report')
+  # Build subtitle with job info for dashboard parsing.
+  # Format: "job_number | client_company | site_address | date"
+  # The dashboard splits on " | " to extract each field.
+  _sub = []
+  if defined('report.quadra_job_number'):
+    _sub.append(str(report.quadra_job_number))
+  else:
+    _sub.append('New Report')
+  if defined('report.client_company'):
+    _sub.append(str(report.client_company))
+  if defined('report.site_address'):
+    _sub.append(str(report.site_address).replace('\n', ' ').replace('\r', ' ')[:60])
+  if defined('report.site_visit_date'):
+    _sub.append(format_date(report.site_visit_date, format='yyyy-MM-dd'))
+  set_parts(subtitle=' | '.join(_sub))
 ---
 question: |
   Quadra Utility Locate Report
 subquestion: |
   Welcome to the Quadra Utility Locate Report system.
   
-  <small class="text-muted">Version 1.5.29</small>
+  <small class="text-muted">Version 1.6.0</small>
 field: report_action
 buttons:
   - Start New Report: new
@@ -1250,7 +1263,45 @@ code: |
   # Review
   review_complete
   
+  # Tag session as completed for dashboard
+  session_tagged_complete
+  
   final_screen
+---
+code: |
+  # Mark session as completed for dashboard (runs once when final_screen is needed)
+  session_tags().add('completed')
+  
+  # Archive the PDF to server filesystem for persistent access (map pins, etc.)
+  # This generates the full PDF and saves a copy — separate from the download event.
+  try:
+    from docassemble.base.util import pdf_concatenate, DAStaticFile
+    _archive_parts = [cover_pdf.pdf, report_pdf.pdf]
+    for _aidx in range(len(report.get_report_cont_pages())):
+      _archive_parts.append(report.cont_pages[_aidx].filled_pdf.pdf)
+    for _aidx, _apage in enumerate(report.photo_pages):
+      if _apage.has_content():
+        _archive_parts.append(_apage.filled_pdf.pdf)
+    for _aidx in range(report.num_drawings if defined('report.num_drawings') else 0):
+      _adrawing = report.drawings[_aidx]
+      if hasattr(_adrawing, 'file') and _adrawing.file:
+        if _adrawing.is_large_format():
+          _archive_parts.append(_adrawing.filled_pdf_wide.pdf)
+        else:
+          _archive_parts.append(_adrawing.filled_pdf_letter.pdf)
+    _archive_parts.append(DAStaticFile(filename='data/static/legend_page.pdf'))
+    _archived_pdf = pdf_concatenate(*_archive_parts, filename=report.get_export_filename())
+    ReportArchiver.archive_pdf(_archived_pdf, report.quadra_job_number)
+  except Exception as _archive_err:
+    log('ReportArchiver: failed during finalization: ' + str(_archive_err), 'warning')
+  
+  # Save a map pin for this job (geocode address + store record)
+  try:
+    JobMapService.save_job_pin(report)
+  except Exception as _map_err:
+    log('JobMapService: failed during finalization: ' + str(_map_err), 'warning')
+  
+  session_tagged_complete = True
 ---
 event: final_screen
 question: |
@@ -1274,10 +1325,22 @@ subquestion: |
   
   ${ action_button_html(url_action('download_report'), label='Download PDF Report', icon='download', color='primary', size='lg') }
   
+  % if DropboxService.is_configured() and DropboxService.is_linked():
+  ${ action_button_html(url_action('save_to_dropbox'), label='Save to Dropbox', icon='cloud-upload-alt', color='info', size='lg') }
+  % elif DropboxService.is_configured():
+  <small class="text-muted"><i class="fab fa-dropbox"></i> <a href="${ interview_url(i='docassemble.quadralocate:data/questions/dashboard.yml') }">Link your Dropbox</a> to save reports directly to your cloud.</small>
+  % endif
+  
   ---
   
   ${ action_button_html(url_action('edit_report'), label='Edit This Report', icon='edit', color='secondary') }
   ${ action_button_html(url_action('new_report'), label='Start New Report', icon='plus', color='secondary') }
+  
+  <div style="margin-top: 1rem;">
+    <a href="${ interview_url(i='docassemble.quadralocate:data/questions/dashboard.yml') }" class="btn btn-outline-dark btn-sm">
+      <i class="fas fa-tachometer-alt"></i>&nbsp; Back to Dashboard
+    </a>
+  </div>
 buttons:
   - Exit: exit
 section: review
@@ -1420,6 +1483,63 @@ code: |
 event: new_report
 code: |
   command('new_session')
+---
+# ============================================
+# DROPBOX — Save PDF to linked Dropbox account
+# ============================================
+event: save_to_dropbox
+code: |
+  # Upload the archived PDF to the user's linked Dropbox.
+  # Filename uses the standard export format: "YYYY-MM-DD Client Address QJN.pdf"
+  _db_filename = report.get_export_filename()
+  _db_folder = '/Quadra Reports'
+  _db_path = _db_folder + '/' + _db_filename
+  _archived_path = ReportArchiver.get_archived_path(report.quadra_job_number)
+  if _archived_path:
+    _db_ok = DropboxService.upload_file(_archived_path, _db_path)
+  else:
+    # Fallback: generate PDF on-the-fly
+    from docassemble.base.util import pdf_concatenate, DAStaticFile
+    _db_parts = [cover_pdf.pdf, report_pdf.pdf]
+    for _di in range(len(report.get_report_cont_pages())):
+      _db_parts.append(report.cont_pages[_di].filled_pdf.pdf)
+    for _di2, _dp in enumerate(report.photo_pages):
+      if _dp.has_content():
+        _db_parts.append(_dp.filled_pdf.pdf)
+    for _di3 in range(report.num_drawings if defined('report.num_drawings') else 0):
+      _dd = report.drawings[_di3]
+      if hasattr(_dd, 'file') and _dd.file:
+        if _dd.is_large_format():
+          _db_parts.append(_dd.filled_pdf_wide.pdf)
+        else:
+          _db_parts.append(_dd.filled_pdf_letter.pdf)
+    _db_parts.append(DAStaticFile(filename='data/static/legend_page.pdf'))
+    _db_pdf = pdf_concatenate(*_db_parts, filename=_db_filename)
+    _db_ok = DropboxService.upload_file(_db_pdf, _db_path)
+  dropbox_last_result = 'success' if _db_ok else 'failed'
+  dropbox_last_path = _db_path
+  force_ask('dropbox_result_screen')
+---
+event: dropbox_result_screen
+question: |
+  % if dropbox_last_result == 'success':
+  <i class="fab fa-dropbox" style="color:#0061FF;"></i> Saved to Dropbox
+  % else:
+  <i class="fas fa-exclamation-triangle" style="color:#dc3545;"></i> Dropbox Upload Failed
+  % endif
+subquestion: |
+  % if dropbox_last_result == 'success':
+  Your report has been saved to:
+  
+  **${ dropbox_last_path }**
+  
+  You can find it in your Dropbox under the *Quadra Reports* folder.
+  % else:
+  There was a problem uploading to Dropbox. Please check your connection
+  in the Dashboard and try again.
+  % endif
+buttons:
+  - Back to Report: final_screen
 ---
 # ============================================
 # SAVE PROGRESS FOR MULTI-DAY
