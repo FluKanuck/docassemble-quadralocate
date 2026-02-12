@@ -911,6 +911,69 @@ This keeps continuation pages consistent with existing indexed attachment patter
 
 ---
 
+### ISS-044 — Auto-generated missing-documentation text under utility headings and recommendations
+
+| Detail | Value |
+|--------|-------|
+| **Date opened** | 2026-02-12 |
+| **Date resolved** | *unresolved* |
+| **Status** | **TRIED** |
+| **Version** | 1.5.22 |
+| **Commits** | *(pending commit)* |
+
+**Symptom:** Missing documentation selections were only represented as checkboxes/generic recommendation text; report output needed utility-specific auto text under corresponding headings (e.g., electrical when BC Hydro is missing), include technician locate comments below that auto text, and force corresponding section output even when no locate method was selected.
+
+**What we tried:**
+1. Added explicit missing-doc mappings in `LocateReport` from doc keys to utility sections (`hydro->electrical`, `comm->communications`, `gas+pipeline->gas`, `municipal->water/storm/sanitary`, `asbuilts->recommendations only`) and utility-specific sentence builders.
+2. Reworked utility section assembly in `format_combined_report()` to iterate all utility keys and call a new section formatter that forces section output when mapped docs are missing, while still preserving existing method/header behavior when utility data is otherwise present.
+3. Updated recommendation auto-sentence wording to `*UTILITY/UTILITY LIST* documentation missing on site...` style while retaining existing recommendation composition (manual recommendations + not-in-scope warning) and keeping hydrovac section behavior unchanged.
+
+**What worked:** Implemented and lint-clean. Pending your runtime verification in the interview/export flow.
+
+---
+
+### ISS-045 — Download still defaults to generic `file` name
+
+| Detail | Value |
+|--------|-------|
+| **Date opened** | 2026-02-12 |
+| **Date resolved** | *unresolved* |
+| **Status** | **TRIED** |
+| **Version** | 1.5.23 |
+| **Commits** | *(pending commit)* |
+
+**Symptom:** After v1.5.21 (ISS-043), downloading the generated PDF still presents a generic filename like `file` in the browser save dialog.
+
+**What we tried:**
+1. Reviewed prior filename fixes in the same path (`ISS-019`, `ISS-043`) to avoid regressing extension handling and explicit `filename=` response wiring.
+2. Updated `download_report` to set DAFile attributes with an explicit basename + extension (`set_attributes(filename=<stem>, extension='pdf', mimetype='application/pdf')`) instead of passing a full filename string as the attribute value.
+3. Forced attachment delivery with `content_disposition='attachment'` in `response(...)` while keeping `filename=export_name` and `content_type='application/pdf'` explicit.
+
+**What worked:** Pending user verification.
+
+---
+
+### ISS-046 — Missing-doc utility comments not shown in individual utility detail flow
+
+| Detail | Value |
+|--------|-------|
+| **Date opened** | 2026-02-12 |
+| **Date resolved** | *unresolved* |
+| **Status** | **TRIED** |
+| **Version** | 1.5.23 |
+| **Commits** | *(pending commit)* |
+
+**Symptom:** Recommendation auto-text for missing documentation appears, but utility-level comment sections were not showing/populating for missing-doc-only cases.
+
+**What we tried:**
+1. Reviewed the conditional logic for utility detail questions and found they only triggered on selected locate methods (`has_any_method()`), which excluded missing-doc-only flows.
+2. Updated utility detail `show if` rules to also trigger when mapped missing-doc keys are selected using `report.get_missing_doc_labels_for_utility('<utility_key>')`, while preserving the existing `not_in_scope` exclusion.
+3. Reordered mandatory flow so missing docs are gathered **before** conditional utility-summary gates, then updated those gates to use the same missing-doc-or-method logic. This ensures summary/comment variables are actually asked and available in output.
+
+**What worked:** Implemented and lint-clean; pending your confirmation in interview/runtime testing.
+
+---
+
 <!-- 
   ┌──────────────────────────────────────────────────────────────────┐
   │  TEMPLATE — Copy this block when adding a new issue.            │

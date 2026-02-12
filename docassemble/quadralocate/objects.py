@@ -503,6 +503,22 @@ class Drawing(DAObject):
 
 class LocateReport(DAObject):
     """Main report object that aggregates all components."""
+    MISSING_DOC_LABELS = {
+        'hydro': 'BC Hydro',
+        'comm': 'Communications',
+        'gas': 'Fortis',
+        'municipal': 'Municipal',
+        'pipeline': 'Pipeline',
+        'asbuilts': 'As-builts',
+    }
+    MISSING_DOC_UTILITY_MAP = {
+        'electrical': ['hydro'],
+        'communications': ['comm'],
+        'gas': ['gas', 'pipeline'],
+        'water': ['municipal'],
+        'storm': ['municipal'],
+        'sanitary': ['municipal'],
+    }
     
     def init(self, *pargs, **kwargs):
         super().init(*pargs, **kwargs)
@@ -540,16 +556,7 @@ class LocateReport(DAObject):
     def format_missing_docs_sentence(self):
         """Generate missing documentation warning sentence."""
         missing = []
-        doc_labels = {
-            'hydro': 'BC Hydro',
-            'comm': 'Communications',
-            'gas': 'Fortis',
-            'municipal': 'Municipal',
-            'pipeline': 'Pipeline',
-            'asbuilts': 'As-builts'
-        }
-        
-        for key, label in doc_labels.items():
+        for key, label in self.MISSING_DOC_LABELS.items():
             if self.missing_docs.get(key, False):
                 missing.append(label)
         
@@ -557,9 +564,51 @@ class LocateReport(DAObject):
             return ""
         
         docs_list = oxford_join(missing)
-        return (f"{docs_list} documentation missing on site. It is the responsibility "
+        return (f"*{docs_list}* documentation missing on site. It is the responsibility "
                 "of the Ground Disturber, prior to ground disturbance, to obtain and "
                 "review said documentation.")
+
+    def get_missing_doc_labels_for_utility(self, utility_key):
+        """Return selected missing-doc labels mapped to a utility section."""
+        labels = []
+        for doc_key in self.MISSING_DOC_UTILITY_MAP.get(utility_key, []):
+            if self.missing_docs.get(doc_key, False):
+                label = self.MISSING_DOC_LABELS.get(doc_key, doc_key)
+                labels.append(label)
+        return labels
+
+    def format_utility_missing_docs_sentence(self, utility_key):
+        """Return utility-specific missing-doc sentence (if any)."""
+        labels = self.get_missing_doc_labels_for_utility(utility_key)
+        if not labels:
+            return ""
+        utility_list = oxford_join(labels)
+        return (
+            f"No BC1 Call information available for {utility_list} at the time "
+            "the utility locate was performed."
+        )
+
+    def format_utility_section_with_missing_docs(self, utility_key, utility):
+        """Render a utility section with forced output for mapped missing docs."""
+        has_missing_docs = bool(self.get_missing_doc_labels_for_utility(utility_key))
+        should_display = utility.should_display()
+        if not should_display and not has_missing_docs:
+            return ""
+
+        header = utility.format_header() if should_display else utility.display_name.upper()
+        section_lines = []
+
+        missing_sentence = self.format_utility_missing_docs_sentence(utility_key)
+        if missing_sentence:
+            section_lines.append(missing_sentence)
+
+        summary = getattr(utility, 'summary', '') or ''
+        if summary:
+            section_lines.append(summary)
+
+        if section_lines:
+            return f"{header}:\r" + "\r".join(section_lines)
+        return f"{header}:"
     
     def format_recommendations(self):
         """Format recommendations with auto-appended missing docs and not-in-scope warnings."""
@@ -704,9 +753,10 @@ class LocateReport(DAObject):
         if site_cond:
             sections.append(f"SITE CONDITIONS (Obstructions, inaccessible areas, changes to scope etc.):\r{site_cond}")
         
-        # Utility sections (storm and sanitary now have individual summaries)
-        for utility in self.utilities.get_active_utilities():
-            section = utility.format_section()
+        # Utility sections, including forced output for mapped missing docs.
+        for utility_key, _, _ in self.utilities.UTILITY_TYPES:
+            utility = getattr(self.utilities, utility_key)
+            section = self.format_utility_section_with_missing_docs(utility_key, utility)
             if section:
                 sections.append(section)
         
