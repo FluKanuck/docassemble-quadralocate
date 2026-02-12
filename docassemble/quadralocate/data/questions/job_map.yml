@@ -75,6 +75,22 @@ features:
       .pin-popup .pin-meta { font-size: 0.85rem; color: #555; margin-bottom: 0.5rem; }
       .pin-popup .pin-meta div { margin-bottom: 0.15rem; }
       .pin-popup .btn-sm { font-size: 0.8rem; padding: 0.2rem 0.6rem; }
+
+      /* Reuse basic card styling (same look as dashboard) */
+      .dash-section-title {
+        font-size: 1.1rem;
+        font-weight: 600;
+        color: #333;
+        margin-bottom: 0.75rem;
+        padding-bottom: 0.5rem;
+        border-bottom: 2px solid #e2e8f0;
+      }
+      .dash-card {
+        border: 1px solid #e2e8f0;
+        border-radius: 10px;
+        background: #fff;
+        margin-bottom: 0.5rem;
+      }
     </style>
 ---
 mandatory: True
@@ -94,20 +110,33 @@ subquestion: |
     </div>
   </div>
 
-  <div class="map-search">
-    <input type="text" id="map-search-input" placeholder="Search by job number, client, or address..." />
-    <button onclick="filterPins()"><i class="fas fa-search"></i>&nbsp; Search</button>
-    <button onclick="clearFilter()" style="background: #6c757d;"><i class="fas fa-times"></i>&nbsp; Clear</button>
-  </div>
-
-  <div id="job-map"></div>
-
   <%
-    import json
     all_pins = JobMapService.get_all_pins()
-    pins_json = json.dumps(all_pins)
     pin_count = len(all_pins)
-    # Base URL for serving archived PDFs — use placeholder that JS will replace
+    # Selected job can be set via url_action('map_screen', job='JT-12345')
+    selected_job = action_argument('job')
+    selected_pin = None
+    if selected_job:
+      for _p in all_pins:
+        if _p.get('job_number') == selected_job:
+          selected_pin = _p
+          break
+    if not selected_pin and all_pins:
+      selected_pin = all_pins[0]
+
+    # Build OpenStreetMap embed URL (no external JS; works even with strict CSP)
+    osm_iframe_url = None
+    if selected_pin and selected_pin.get('lat') is not None and selected_pin.get('lng') is not None:
+      lat = float(selected_pin.get('lat'))
+      lon = float(selected_pin.get('lng'))
+      d = 0.01
+      left = lon - d
+      right = lon + d
+      bottom = lat - d
+      top = lat + d
+      bbox = f"{left},{bottom},{right},{top}"
+      osm_iframe_url = "https://www.openstreetmap.org/export/embed.html?bbox=" + bbox + "&layer=mapnik&marker=" + str(lat) + "," + str(lon)
+
     serve_pdf_base = url_action('serve_archived_pdf', job_number='__JOBNUMBER__')
   %>
 
@@ -115,126 +144,51 @@ subquestion: |
     <div><i class="fas fa-map-pin"></i>&nbsp; <span>${ pin_count }</span> job${ 's' if pin_count != 1 else '' } on map</div>
   </div>
 
-  <!-- Leaflet CSS (loaded inline so it's available immediately) -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+  % if osm_iframe_url:
+  <div id="job-map" style="width:100%; height:70vh; min-height:420px; border:1px solid #e2e8f0; border-radius:10px; overflow:hidden; background:#fff;">
+    <iframe
+      title="OpenStreetMap"
+      width="100%"
+      height="100%"
+      frameborder="0"
+      scrolling="no"
+      marginheight="0"
+      marginwidth="0"
+      src="${ osm_iframe_url }">
+    </iframe>
+  </div>
+  % else:
+  <div class="alert alert-warning" role="alert" style="max-width: 900px;">
+    No map preview available yet. Create pins by completing a report, or click <strong>Sync Existing Reports</strong>.
+  </div>
+  % endif
 
-  <!-- Leaflet JS -->
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
-
-  <script>
-    // Job pin data from server
-    var allPins = ${ pins_json };
-    var servePdfBase = "${ serve_pdf_base }";
-    var markers = [];
-    var map;
-
-    function escapeHtml(text) {
-      var div = document.createElement('div');
-      div.appendChild(document.createTextNode(text));
-      return div.innerHTML;
-    }
-
-    function initJobMap() {
-      // Guard: only init once, and only when both Leaflet and the div exist
-      if (map) return;
-      var mapDiv = document.getElementById('job-map');
-      if (!mapDiv || typeof L === 'undefined') return;
-
-      // Default center: BC, Canada (Lower Mainland)
-      map = L.map('job-map').setView([49.25, -123.1], 10);
-
-      // OpenStreetMap tiles (free, no API key)
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-        maxZoom: 19
-      }).addTo(map);
-
-      // Add markers for each pin
-      allPins.forEach(function(pin) {
-        if (pin.lat && pin.lng) {
-          var popup = '<div class="pin-popup">' +
-            '<h5>' + escapeHtml(pin.job_number || 'Unknown') + '</h5>' +
-            '<div class="pin-meta">' +
-            (pin.client_company ? '<div><i class="fas fa-building"></i> ' + escapeHtml(pin.client_company) + '</div>' : '') +
-            (pin.site_address ? '<div><i class="fas fa-map-marker-alt"></i> ' + escapeHtml(pin.site_address) + '</div>' : '') +
-            (pin.site_visit_date ? '<div><i class="fas fa-calendar"></i> ' + escapeHtml(pin.site_visit_date) + '</div>' : '') +
-            '</div>' +
-            '<a href="' + servePdfBase.replace('__JOBNUMBER__', encodeURIComponent(pin.job_number || '')) + '" target="_blank" class="btn btn-sm btn-success">' +
-            '<i class="fas fa-download"></i> Download Report</a>' +
-            '</div>';
-
-          var marker = L.marker([pin.lat, pin.lng])
-            .bindPopup(popup)
-            .addTo(map);
-
-          marker._pinData = pin;
-          markers.push(marker);
-        }
-      });
-
-      // Fit map to show all markers (if any)
-      if (markers.length > 0) {
-        var group = L.featureGroup(markers);
-        map.fitBounds(group.getBounds().pad(0.1));
-      }
-
-      // Enter key in search box
-      var searchInput = document.getElementById('map-search-input');
-      if (searchInput) {
-        searchInput.addEventListener('keypress', function(e) {
-          if (e.key === 'Enter') filterPins();
-        });
-      }
-
-      // Force Leaflet to recalculate size (fixes grey/partial tiles)
-      setTimeout(function() { map.invalidateSize(); }, 200);
-    }
-
-    function filterPins() {
-      var query = document.getElementById('map-search-input').value.toLowerCase().trim();
-      if (!query) { clearFilter(); return; }
-      var matchBounds = [];
-      markers.forEach(function(marker) {
-        var pin = marker._pinData;
-        var searchText = [pin.job_number||'', pin.client_company||'', pin.site_address||''].join(' ').toLowerCase();
-        if (searchText.indexOf(query) !== -1) {
-          marker.addTo(map);
-          matchBounds.push(marker.getLatLng());
-        } else {
-          map.removeLayer(marker);
-        }
-      });
-      if (matchBounds.length > 0) {
-        map.fitBounds(L.latLngBounds(matchBounds).pad(0.2));
-      }
-    }
-
-    function clearFilter() {
-      document.getElementById('map-search-input').value = '';
-      markers.forEach(function(marker) { marker.addTo(map); });
-      if (markers.length > 0) {
-        map.fitBounds(L.featureGroup(markers).getBounds().pad(0.1));
-      }
-    }
-
-    // Docassemble injects subquestion HTML after DOMContentLoaded has already fired.
-    // Use multiple strategies to ensure the map initializes:
-    // 1. Try immediately (in case Leaflet loaded synchronously)
-    // 2. Retry on a short interval until the div + Leaflet are both available
-    // 3. Also hook jQuery ready as a fallback
-    (function() {
-      initJobMap();
-      var _retries = 0;
-      var _interval = setInterval(function() {
-        _retries++;
-        if (map || _retries > 50) { clearInterval(_interval); return; }
-        initJobMap();
-      }, 200);
-    })();
-    if (typeof $ !== 'undefined') {
-      $(document).ready(function() { initJobMap(); });
-    }
-  </script>
+  <div style="margin-top: 1rem; max-width: 1100px;">
+    <div class="dash-section-title"><i class="fas fa-list"></i>&nbsp; Jobs</div>
+    % if all_pins:
+      % for p in all_pins:
+        <div class="dash-card" style="padding: 0.75rem 1rem;">
+          <div style="display:flex; justify-content:space-between; align-items:center; gap: 0.75rem; flex-wrap: wrap;">
+            <div>
+              <strong>${ p.get('job_number','') }</strong>
+              % if p.get('client_company'):
+              — ${ p.get('client_company') }
+              % endif
+              % if p.get('site_address'):
+              <div style="color:#6c757d; font-size:0.9rem;"><i class="fas fa-map-marker-alt"></i>&nbsp; ${ p.get('site_address') }</div>
+              % endif
+            </div>
+            <div style="display:flex; gap:0.5rem; flex-wrap: wrap;">
+              <a class="btn btn-sm btn-outline-secondary" href="${ url_action('map_screen', job=p.get('job_number','')) }">View on map</a>
+              <a class="btn btn-sm btn-success" target="_blank" href="${ serve_pdf_base.replace('__JOBNUMBER__', p.get('job_number','')) }">Download PDF</a>
+            </div>
+          </div>
+        </div>
+      % endfor
+    % else:
+      <div class="text-muted">No pins yet. Complete a report or click Sync Existing Reports.</div>
+    % endif
+  </div>
   <div style="margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid #e2e8f0;">
     <small class="text-muted">
       Pins are created automatically when reports are completed.

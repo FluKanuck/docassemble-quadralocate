@@ -1149,6 +1149,26 @@ This keeps continuation pages consistent with existing indexed attachment patter
 
 ---
 
+### ISS-056 — ReportArchiver cover_pdf NameError + Job Map blocked by external script policy (v1.6.8)
+
+| Detail | Value |
+|--------|-------|
+| **Date opened** | 2026-02-12 |
+| **Date resolved** | *unresolved* |
+| **Status** | **TRIED** |
+| **Version** | 1.6.8 |
+| **Commits** | *(pending commit)* |
+
+**Symptom:** On Generate Report, a warning appears: `ReportArchiver: failed during finalization: name 'cover_pdf' is not defined` (report still downloads correctly). Job Map shows “1 job on map” but the embedded Leaflet map does not render (likely blocked by Docassemble CSP / external script restrictions).
+
+**What we tried:**
+1. Fixed ReportArchiver finalization: explicitly referenced `cover_pdf` and `report_pdf` before accessing `.pdf` so Docassemble defines those attachment variables in that block.
+2. Replaced Leaflet map (external JS) with an OpenStreetMap **iframe embed** preview (no external JS), driven by pin coordinates. Added a Jobs list with “View on map” and “Download PDF” links.
+
+**What worked:** Pending user verification.
+
+---
+
 ### ISS-055 — Nominatim geocoding blocked (403) + address autocomplete selector mismatch (v1.6.2)
 
 | Detail | Value |
@@ -1156,7 +1176,7 @@ This keeps continuation pages consistent with existing indexed attachment patter
 | **Date opened** | 2026-02-12 |
 | **Date resolved** | *unresolved* |
 | **Status** | **TRIED** |
-| **Version** | 1.6.7 |
+| **Version** | 1.6.8 |
 | **Commits** | *(pending commit)* |
 
 **Symptom:** Tech reports that Site Address autocomplete still shows no suggestions (field renders as single-line input). Map sync creates no pins.

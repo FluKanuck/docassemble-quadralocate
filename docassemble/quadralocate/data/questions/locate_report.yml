@@ -6,7 +6,7 @@ metadata:
   authors:
     - name: Quadra Utility Locating Ltd.
   revision_date: 2026-02-12
-  version: 1.6.7
+  version: 1.6.8
 ---
 modules:
   - docassemble.quadralocate.objects
@@ -265,7 +265,7 @@ question: |
 subquestion: |
   Welcome to the Quadra Utility Locate Report system.
   
-  <small class="text-muted">Version 1.6.7</small>
+  <small class="text-muted">Version 1.6.8</small>
 field: report_action
 buttons:
   - Start New Report: new
@@ -1513,6 +1513,9 @@ code: |
   # This generates the full PDF and saves a copy — separate from the download event.
   try:
     from docassemble.base.util import pdf_concatenate, DAStaticFile
+    # Ensure attachment variables exist before referencing .pdf (prevents NameError)
+    cover_pdf
+    report_pdf
     _archive_parts = [cover_pdf.pdf, report_pdf.pdf]
     for _aidx in range(len(report.get_report_cont_pages())):
       _archive_parts.append(report.cont_pages[_aidx].filled_pdf.pdf)
