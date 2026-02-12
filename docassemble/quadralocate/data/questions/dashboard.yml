@@ -169,28 +169,27 @@ subquestion: |
   % if completed:
   <div class="dash-section-title" style="margin-top: 1.5rem;"><i class="fas fa-check-circle"></i>&nbsp; Completed Reports</div>
   % for item in completed:
+  <%
+    # Build card title: "date client address job_number"
+    _title_parts = []
+    if item['date']:
+      _title_parts.append(item['date'])
+    if item['client']:
+      _title_parts.append(item['client'])
+    if item['address']:
+      _title_parts.append(item['address'][:50])
+    if item['job_number']:
+      _title_parts.append(item['job_number'])
+    _card_title = ' — '.join(_title_parts) if _title_parts else 'Report'
+  %>
   <div class="dash-card">
     <div class="dash-card-header">
-      <h5>${ item['job_number'] or 'Report' }</h5>
+      <h5>${ _card_title }</h5>
       <span class="dash-badge badge-completed">Completed</span>
     </div>
-    <div class="dash-card-meta">
-      % if item['client']:
-      <span><i class="fas fa-building"></i>&nbsp; ${ item['client'] }</span>
-      % endif
-      % if item['address']:
-      <span><i class="fas fa-map-marker-alt"></i>&nbsp; ${ item['address'][:60] }</span>
-      % endif
-      % if item['date']:
-      <span><i class="fas fa-calendar"></i>&nbsp; ${ item['date'] }</span>
-      % endif
-    </div>
     <div class="dash-card-actions">
-      <a href="${ interview_url(i='docassemble.quadralocate:data/questions/locate_report.yml', session=item['session']) }" class="btn btn-sm btn-outline-primary">
-        <i class="fas fa-eye"></i>&nbsp; View
-      </a>
-      <a href="${ interview_url(i='docassemble.quadralocate:data/questions/locate_report.yml', session=item['session'], action='download_report') }" class="btn btn-sm btn-success">
-        <i class="fas fa-download"></i>&nbsp; Download PDF
+      <a href="${ interview_url(i='docassemble.quadralocate:data/questions/locate_report.yml', session=item['session']) }" class="btn btn-sm btn-primary">
+        <i class="fas fa-eye"></i>&nbsp; View &amp; Download
       </a>
     </div>
   </div>

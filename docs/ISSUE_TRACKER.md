@@ -1126,6 +1126,29 @@ This keeps continuation pages consistent with existing indexed attachment patter
 
 ---
 
+### ISS-054 — Dashboard/Map post-testing fixes (v1.6.1)
+
+| Detail | Value |
+|--------|-------|
+| **Date opened** | 2026-02-12 |
+| **Date resolved** | *unresolved* |
+| **Status** | **TRIED** |
+| **Version** | 1.6.1 |
+| **Commits** | *(pending commit)* |
+
+**Symptom:** After deploying v1.6.0, user reported: (1) no address autocomplete on Site Address field, (2) Download PDF button on dashboard does nothing, (3) completed report card title only shows job number instead of full details, (4) Job Map page has no visible map and 0 pins despite a completed report existing.
+
+**What we tried:**
+1. Added Nominatim-based address autocomplete via jQuery + AJAX in the global `initial: True` script block. Debounced at 350ms, limited to Canadian addresses (`countrycodes: ca`), shows dropdown suggestions below the Site Address textarea.
+2. Fixed Download PDF button: `interview_url(..., action='download_report')` doesn't trigger DA actions. Replaced with a single "View & Download" button that links to the session's final_screen (where the real Download button works).
+3. Changed completed card title from just `job_number` to `date — client — address — job_number` using a Mako `<% %>` block to build the formatted string.
+4. Fixed map not rendering: `DOMContentLoaded` fires before Docassemble injects subquestion HTML. Replaced with polling `initJobMap()` on a 200ms interval (up to 50 retries) + jQuery ready fallback + `map.invalidateSize()` to fix grey tiles. Removed `integrity` attributes from CDN links (can cause loading failures).
+5. Fixed 0 pins: added "Sync Existing Reports" button on the map page. Scans all completed sessions via `interview_list()`, extracts address from subtitle, geocodes via Nominatim, and creates pins for any missing jobs. Respects 1 req/sec rate limit.
+
+**What worked:** Pending user verification.
+
+---
+
 <!-- 
   ┌──────────────────────────────────────────────────────────────────┐
   │  TEMPLATE — Copy this block when adding a new issue.            │

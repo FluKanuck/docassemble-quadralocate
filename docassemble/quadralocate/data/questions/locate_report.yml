@@ -6,7 +6,7 @@ metadata:
   authors:
     - name: Quadra Utility Locating Ltd.
   revision_date: 2026-02-12
-  version: 1.6.0
+  version: 1.6.1
 ---
 modules:
   - docassemble.quadralocate.objects
@@ -37,6 +37,25 @@ code: |
   # Global JavaScript for time input handling (runs on every page load)
   pass
 script: |
+  <style>
+    /* Address autocomplete dropdown */
+    .addr-autocomplete { position: relative; }
+    .addr-suggestions {
+      position: absolute; z-index: 9999; left: 0; right: 0;
+      background: #fff; border: 1px solid #ccc; border-top: none;
+      border-radius: 0 0 6px 6px; max-height: 220px; overflow-y: auto;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.12); display: none;
+    }
+    .addr-suggestions div {
+      padding: 0.5rem 0.75rem; cursor: pointer; font-size: 0.9rem;
+      border-bottom: 1px solid #f0f0f0;
+    }
+    .addr-suggestions div:hover, .addr-suggestions div.active {
+      background: #e9f0f8;
+    }
+    .addr-suggestions div:last-child { border-bottom: none; }
+    .addr-powered { font-size: 0.7rem; color: #aaa; text-align: right; padding: 0.25rem 0.5rem; }
+  </style>
   <script>
     // Restrict time inputs to 15-minute increments (for Time on Site fields).
     // Uses jQuery event delegation so it works for dynamically added rows (list collect)
@@ -60,6 +79,51 @@ script: |
         m = Math.round(m / 15) * 15;
         if (m === 60) { m = 0; h = (h + 1) % 24; }
         this.value = ('0' + h).slice(-2) + ':' + ('0' + m).slice(-2);
+      });
+
+      // ── Address autocomplete via Nominatim (OpenStreetMap) ──
+      // Targets any textarea whose DA field name contains "site_address".
+      var _addrTimer = null;
+      $(document).on('input', 'textarea[alt="Site Address"], textarea[name*="site_address"]', function() {
+        var $input = $(this);
+        var query = $input.val().trim();
+        clearTimeout(_addrTimer);
+        // Remove old dropdown
+        $input.parent().find('.addr-suggestions').remove();
+        if (query.length < 4) return;
+        _addrTimer = setTimeout(function() {
+          $.ajax({
+            url: 'https://nominatim.openstreetmap.org/search',
+            data: { q: query, format: 'json', addressdetails: 1, limit: 6, countrycodes: 'ca' },
+            headers: { 'Accept-Language': 'en' },
+            success: function(results) {
+              $input.parent().find('.addr-suggestions').remove();
+              if (!results || results.length === 0) return;
+              // Wrap input if not wrapped
+              if (!$input.parent().hasClass('addr-autocomplete')) {
+                $input.wrap('<div class="addr-autocomplete"></div>');
+              }
+              var $drop = $('<div class="addr-suggestions"></div>');
+              results.forEach(function(r) {
+                var label = r.display_name || '';
+                $drop.append($('<div></div>').text(label).on('mousedown', function(e) {
+                  e.preventDefault();
+                  $input.val(label);
+                  $drop.remove();
+                  $input.trigger('change');
+                }));
+              });
+              $drop.append('<div class="addr-powered">Powered by OpenStreetMap</div>');
+              $input.parent().append($drop);
+              $drop.show();
+            }
+          });
+        }, 350); // debounce 350ms to respect Nominatim rate limit
+      });
+      // Hide dropdown on blur (with small delay for click to register)
+      $(document).on('blur', 'textarea[alt="Site Address"], textarea[name*="site_address"]', function() {
+        var $input = $(this);
+        setTimeout(function() { $input.parent().find('.addr-suggestions').remove(); }, 200);
       });
     });
   </script>
@@ -106,7 +170,7 @@ question: |
 subquestion: |
   Welcome to the Quadra Utility Locate Report system.
   
-  <small class="text-muted">Version 1.6.0</small>
+  <small class="text-muted">Version 1.6.1</small>
 field: report_action
 buttons:
   - Start New Report: new

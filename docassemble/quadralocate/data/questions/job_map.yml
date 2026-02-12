@@ -115,15 +115,11 @@ subquestion: |
     <div><i class="fas fa-map-pin"></i>&nbsp; <span>${ pin_count }</span> job${ 's' if pin_count != 1 else '' } on map</div>
   </div>
 
-  <!-- Leaflet CSS -->
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
-    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
-    crossorigin="" />
+  <!-- Leaflet CSS (loaded inline so it's available immediately) -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
 
   <!-- Leaflet JS -->
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
-    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
-    crossorigin=""></script>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 
   <script>
     // Job pin data from server
@@ -132,9 +128,19 @@ subquestion: |
     var markers = [];
     var map;
 
-    // Initialize map centered on BC, Canada
-    document.addEventListener('DOMContentLoaded', function() {
-      // Default center: BC, Canada (roughly Vancouver/Lower Mainland)
+    function escapeHtml(text) {
+      var div = document.createElement('div');
+      div.appendChild(document.createTextNode(text));
+      return div.innerHTML;
+    }
+
+    function initJobMap() {
+      // Guard: only init once, and only when both Leaflet and the div exist
+      if (map) return;
+      var mapDiv = document.getElementById('job-map');
+      if (!mapDiv || typeof L === 'undefined') return;
+
+      // Default center: BC, Canada (Lower Mainland)
       map = L.map('job-map').setView([49.25, -123.1], 10);
 
       // OpenStreetMap tiles (free, no API key)
@@ -142,17 +148,6 @@ subquestion: |
         attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
         maxZoom: 19
       }).addTo(map);
-
-      // Custom pin icon
-      var pinIcon = L.icon({
-        iconUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon.png',
-        iconRetinaUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-icon-2x.png',
-        shadowUrl: 'https://unpkg.com/leaflet@1.9.4/dist/images/marker-shadow.png',
-        iconSize: [25, 41],
-        iconAnchor: [12, 41],
-        popupAnchor: [1, -34],
-        shadowSize: [41, 41]
-      });
 
       // Add markers for each pin
       allPins.forEach(function(pin) {
@@ -168,11 +163,10 @@ subquestion: |
             '<i class="fas fa-download"></i> Download Report</a>' +
             '</div>';
 
-          var marker = L.marker([pin.lat, pin.lng], {icon: pinIcon})
+          var marker = L.marker([pin.lat, pin.lng])
             .bindPopup(popup)
             .addTo(map);
 
-          // Store search data on marker for filtering
           marker._pinData = pin;
           markers.push(marker);
         }
@@ -185,61 +179,139 @@ subquestion: |
       }
 
       // Enter key in search box
-      document.getElementById('map-search-input').addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') filterPins();
-      });
-    });
+      var searchInput = document.getElementById('map-search-input');
+      if (searchInput) {
+        searchInput.addEventListener('keypress', function(e) {
+          if (e.key === 'Enter') filterPins();
+        });
+      }
 
-    function escapeHtml(text) {
-      var div = document.createElement('div');
-      div.appendChild(document.createTextNode(text));
-      return div.innerHTML;
+      // Force Leaflet to recalculate size (fixes grey/partial tiles)
+      setTimeout(function() { map.invalidateSize(); }, 200);
     }
 
     function filterPins() {
       var query = document.getElementById('map-search-input').value.toLowerCase().trim();
       if (!query) { clearFilter(); return; }
-
-      var matchCount = 0;
       var matchBounds = [];
-
       markers.forEach(function(marker) {
         var pin = marker._pinData;
-        var searchText = [
-          pin.job_number || '',
-          pin.client_company || '',
-          pin.site_address || ''
-        ].join(' ').toLowerCase();
-
+        var searchText = [pin.job_number||'', pin.client_company||'', pin.site_address||''].join(' ').toLowerCase();
         if (searchText.indexOf(query) !== -1) {
           marker.addTo(map);
           matchBounds.push(marker.getLatLng());
-          matchCount++;
         } else {
           map.removeLayer(marker);
         }
       });
-
-      // Zoom to matching markers
       if (matchBounds.length > 0) {
-        var bounds = L.latLngBounds(matchBounds);
-        map.fitBounds(bounds.pad(0.2));
+        map.fitBounds(L.latLngBounds(matchBounds).pad(0.2));
       }
     }
 
     function clearFilter() {
       document.getElementById('map-search-input').value = '';
-      markers.forEach(function(marker) {
-        marker.addTo(map);
-      });
+      markers.forEach(function(marker) { marker.addTo(map); });
       if (markers.length > 0) {
-        var group = L.featureGroup(markers);
-        map.fitBounds(group.getBounds().pad(0.1));
+        map.fitBounds(L.featureGroup(markers).getBounds().pad(0.1));
       }
     }
+
+    // Docassemble injects subquestion HTML after DOMContentLoaded has already fired.
+    // Use multiple strategies to ensure the map initializes:
+    // 1. Try immediately (in case Leaflet loaded synchronously)
+    // 2. Retry on a short interval until the div + Leaflet are both available
+    // 3. Also hook jQuery ready as a fallback
+    (function() {
+      initJobMap();
+      var _retries = 0;
+      var _interval = setInterval(function() {
+        _retries++;
+        if (map || _retries > 50) { clearInterval(_interval); return; }
+        initJobMap();
+      }, 200);
+    })();
+    if (typeof $ !== 'undefined') {
+      $(document).ready(function() { initJobMap(); });
+    }
   </script>
+  <div style="margin-top: 1rem; padding-top: 0.75rem; border-top: 1px solid #e2e8f0;">
+    <small class="text-muted">
+      Pins are created automatically when reports are completed.
+      If you have older reports that don't appear, click Sync to scan for them.
+    </small>
+  </div>
 buttons:
   - Refresh Map: refresh
+  - Sync Existing Reports: sync_pins
+---
+# Sync pins for reports completed before v1.6.0
+event: sync_pins
+code: |
+  # Scan all completed Locate Report sessions and create map pins for any
+  # that are missing. This handles reports completed before the map feature
+  # was added.
+  _raw = interview_list(
+    filename='docassemble.quadralocate:data/questions/locate_report.yml',
+    exclude_invalid=True
+  )
+  # Handle both list and (list, next_id) tuple return from interview_list
+  _sessions = _raw[0] if isinstance(_raw, (list, tuple)) and len(_raw) > 0 and isinstance(_raw[0], list) else (_raw if isinstance(_raw, list) else [])
+  _synced = 0
+  _skipped = 0
+  for _s in _sessions:
+    _tags = _s.get('tags', set()) or set()
+    if 'completed' not in _tags:
+      continue
+    _subtitle = _s.get('subtitle', '') or ''
+    _parts = [p.strip() for p in _subtitle.split(' | ')]
+    _jn = _parts[0] if len(_parts) > 0 else ''
+    _cl = _parts[1] if len(_parts) > 1 else ''
+    _ad = _parts[2] if len(_parts) > 2 else ''
+    _dt = _parts[3] if len(_parts) > 3 else ''
+    if not _jn or _jn == 'New Report' or not _ad:
+      _skipped += 1
+      continue
+    # Check if pin already exists
+    if JobMapService.pin_exists(_jn):
+      _skipped += 1
+      continue
+    # Geocode and create pin
+    _lat, _lng = JobMapService.geocode_address(_ad)
+    if _lat is not None and _lng is not None:
+      from docassemble.base.util import write_record
+      from datetime import datetime
+      write_record(JobMapService.RECORD_KEY, {
+        'job_number': _jn,
+        'site_address': _ad,
+        'client_company': _cl,
+        'site_visit_date': _dt,
+        'lat': _lat,
+        'lng': _lng,
+        'pdf_filename': _jn + '.pdf',
+        'created_at': datetime.now().isoformat(),
+      })
+      _synced += 1
+    else:
+      _skipped += 1
+    # Brief pause to respect Nominatim rate limit (1 req/sec)
+    import time
+    time.sleep(1.1)
+  sync_result_count = _synced
+  sync_skipped_count = _skipped
+  force_ask('sync_result_screen')
+---
+event: sync_result_screen
+question: |
+  Sync Complete
+subquestion: |
+  **${ sync_result_count }** new pin${ 's' if sync_result_count != 1 else '' } added to the map.
+
+  % if sync_skipped_count > 0:
+  ${ sync_skipped_count } report${ 's' if sync_skipped_count != 1 else '' } skipped (already on map, missing address, or geocoding failed).
+  % endif
+buttons:
+  - Back to Map: map_screen
 ---
 # Serve an archived PDF for download (triggered from map pin popup links)
 event: serve_archived_pdf
