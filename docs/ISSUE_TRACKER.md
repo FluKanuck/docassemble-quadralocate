@@ -1079,6 +1079,27 @@ This keeps continuation pages consistent with existing indexed attachment patter
 
 ---
 
+### ISS-052 — Download regression: file-not-found after DAFile metadata-only response
+
+| Detail | Value |
+|--------|-------|
+| **Date opened** | 2026-02-12 |
+| **Date resolved** | *unresolved* |
+| **Status** | **TRIED** |
+| **Version** | 1.5.29 |
+| **Commits** | *(pending commit)* |
+
+**Symptom:** After v1.5.28, clicking Download produced a file-not-found error again.
+
+**What we tried:**
+1. Traced regression to the metadata-only response path in `download_report` that removed the explicit response filename and used `set_attributes(filename=<stem>, extension='pdf')` with `response(file=final_report, content_type='application/pdf')`.
+2. Reverted download wiring to the last known-safe pattern: `set_attributes(filename=export_name)` plus explicit `response(file=final_report, filename=export_name, content_type='application/pdf')`.
+3. Kept all other flow logic unchanged (page assembly and export name generation) to isolate the fix.
+
+**What worked:** Pending user verification.
+
+---
+
 <!-- 
   ┌──────────────────────────────────────────────────────────────────┐
   │  TEMPLATE — Copy this block when adding a new issue.            │
