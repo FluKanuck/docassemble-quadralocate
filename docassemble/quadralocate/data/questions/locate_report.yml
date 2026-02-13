@@ -5,7 +5,7 @@ metadata:
   description: Site Locate Report for Quadra Utility Locating Ltd.
   authors:
     - name: Quadra Utility Locating Ltd.
-  revision_date: 2026-02-12
+  revision_date: 2026-02-13
   version: 1.6.8
 ---
 modules:
@@ -61,7 +61,7 @@ script: |
     // Uses jQuery event delegation so it works for dynamically added rows (list collect)
     // without interfering with Docassemble's list-collection JavaScript.
     $(document).ready(function() {
-      // Set step on existing inputs (spinner arrows jump in 15-min steps).
+      // Set step on existing inputs (15-min steps; matches TIME_INPUT_STEP_SECONDS in objects.py).
       $('input[type="time"]').attr('step', '900');
 
       // Set step on new inputs when they receive focus (covers list-collect rows).
@@ -122,7 +122,7 @@ script: |
               $drop.show();
             }
           });
-        }, 350); // debounce 350ms to respect Nominatim rate limit
+        }, 350); // debounce ms — matches ADDRESS_SUGGEST_DEBOUNCE_MS in objects.py
       });
       // Hide dropdown on blur (with small delay for click to register)
       $(document).on('blur', _addrSelector, function() {
@@ -134,93 +134,70 @@ script: |
 ---
 event: address_suggest
 code: |
-  import os
   import json
   import requests
   import re
-  from docassemble.base.util import get_config
 
   q = action_argument('q')
   q = str(q or '').strip()
-  if len(q) < 3:
+  if len(q) < ADDRESS_SUGGEST_MIN_LEN:
     response(binaryresponse=b'[]', content_type='application/json')
   else:
-    # Extract leading house number from user input (if any)
-    m = re.match(r'^\s*(\d{1,6})\s+(.*)$', q)
-    typed_house_number = m.group(1) if m else None
-    contact_email = (
-      get_config('nominatim email')
-      or get_config('admin email')
-      or os.environ.get('NOMINATIM_EMAIL')
-      or os.environ.get('LETSENCRYPTEMAIL')
-      or 'admin@quadra.com'
-    )
-    user_agent = (
-      get_config('nominatim user agent')
-      or os.environ.get('NOMINATIM_USER_AGENT')
-      or f"QuadraLocate/1.0 ({contact_email})"
-    )
-    headers = {
-      'User-Agent': user_agent,
-      'Accept-Language': 'en',
-    }
-    params = {
-      'q': q,
-      'format': 'json',
-      'addressdetails': 1,
-      'limit': 6,
-      'countrycodes': 'ca',
-      'email': contact_email,
-    }
-    r = requests.get(
-      'https://nominatim.openstreetmap.org/search',
-      params=params,
-      headers=headers,
-      timeout=10,
-    )
-    if r.status_code != 200:
+    try:
+      m = re.match(r'^\s*(\d{1,6})\s+(.*)$', q)
+      typed_house_number = m.group(1) if m else None
+      contact_email = get_nominatim_contact_email()
+      user_agent = get_nominatim_user_agent()
+      headers = {'User-Agent': user_agent, 'Accept-Language': 'en'}
+      params = {
+        'q': q,
+        'format': 'json',
+        'addressdetails': 1,
+        'limit': ADDRESS_SUGGEST_LIMIT,
+        'countrycodes': 'ca',
+        'email': contact_email,
+      }
+      r = requests.get(
+        'https://nominatim.openstreetmap.org/search',
+        params=params,
+        headers=headers,
+        timeout=10,
+      )
+      if r.status_code != 200:
+        response(binaryresponse=b'[]', content_type='application/json')
+      else:
+        try:
+          raw = r.json()
+        except Exception:
+          raw = []
+        out = []
+        for item in (raw or []):
+          if not isinstance(item, dict):
+            continue
+          addr = item.get('address') if isinstance(item.get('address'), dict) else {}
+          house_number = addr.get('house_number')
+          road = addr.get('road') or addr.get('pedestrian') or addr.get('footway') or addr.get('path')
+          city = addr.get('city') or addr.get('town') or addr.get('village') or addr.get('municipality') or addr.get('hamlet')
+          street = None
+          if road and (house_number or typed_house_number):
+            street = f"{house_number or typed_house_number} {road}".strip()
+          elif road:
+            street = str(road).strip()
+          label = None
+          if street and city:
+            label = f"{street}, {city}".strip()
+          elif street:
+            label = street
+          else:
+            display_name = item.get('display_name')
+            if isinstance(display_name, str) and display_name.strip():
+              parts = [p.strip() for p in display_name.split(',') if p.strip()]
+              label = ', '.join(parts[:2]) if parts else None
+          if label:
+            out.append(label)
+        response(binaryresponse=json.dumps(out).encode('utf-8'), content_type='application/json')
+    except Exception:
       response(binaryresponse=b'[]', content_type='application/json')
-    else:
-      # Return a small list of *clean* address strings:
-      #   "3426 Terra Vita Place, Vancouver"
-      # Avoid neighborhood, regional district, postal codes, etc.
-      try:
-        raw = r.json()
-      except Exception:
-        raw = []
-      out = []
-      for item in (raw or []):
-        if not isinstance(item, dict):
-          continue
-        addr = item.get('address') if isinstance(item.get('address'), dict) else {}
-        # Nominatim fields vary; these are common keys:
-        house_number = addr.get('house_number')
-        road = addr.get('road') or addr.get('pedestrian') or addr.get('footway') or addr.get('path')
-        city = addr.get('city') or addr.get('town') or addr.get('village') or addr.get('municipality') or addr.get('hamlet')
-
-        # Build "street" part
-        street = None
-        if road and (house_number or typed_house_number):
-          street = f"{house_number or typed_house_number} {road}".strip()
-        elif road:
-          street = str(road).strip()
-
-        # If we cannot construct a clean street+city, fall back to trimmed display_name
-        label = None
-        if street and city:
-          label = f"{street}, {city}".strip()
-        elif street:
-          label = street
-        else:
-          display_name = item.get('display_name')
-          if isinstance(display_name, str) and display_name.strip():
-            # Take only the first 2 comma-separated parts to reduce verbosity
-            parts = [p.strip() for p in display_name.split(',') if p.strip()]
-            label = ', '.join(parts[:2]) if parts else None
-
-        if label:
-          out.append(label)
-      response(binaryresponse=json.dumps(out).encode('utf-8'), content_type='application/json')
 
 ---
 sections:
@@ -265,36 +242,11 @@ question: |
 subquestion: |
   Welcome to the Quadra Utility Locate Report system.
   
-  <small class="text-muted">Version 1.6.8</small>
+  <small class="text-muted">Version 1.6.10</small>
 field: report_action
 buttons:
   - Start New Report: new
 section: introduction
----
-# TODO: Implement session resume/edit in future version
-# # Resume existing job by Job Number
-# question: |
-#   Resume Existing Job
-# fields:
-#   - Quadra Job Number: resume_job_number
-#     help: Enter the job number to resume
-# section: introduction
-# show if:
-#   variable: report_action
-#   is: resume
-# ---
-# # Edit submitted report
-# question: |
-#   Edit Submitted Report
-# subquestion: |
-#   This will create a revision of the original report.
-# fields:
-#   - Quadra Job Number: edit_job_number
-#     help: Enter the job number to edit
-# section: introduction
-# show if:
-#   variable: report_action
-#   is: edit
 ---
 # ============================================
 # JOB INFORMATION
@@ -310,84 +262,6 @@ fields:
   - Site Visit Date: report.site_visit_date
     datatype: date
     default: ${ today() }
-script: |
-  <script>
-    // Ensure address autocomplete is bound on the Job Information page.
-    // (Docassemble can render this field as input or textarea depending on settings/theme.)
-    (function() {
-      function findSiteAddressField() {
-        // Prefer direct match by variable name
-        var $f = $('textarea[name="report.site_address"], input[name="report.site_address"]');
-        if ($f.length) return $f.first();
-        // Fallback: find by label text
-        var $label = $('label').filter(function() {
-          return ($(this).text() || '').trim().toLowerCase().startsWith('site address');
-        }).first();
-        if ($label.length) {
-          var forId = $label.attr('for');
-          if (forId) {
-            var $byId = $('#' + CSS.escape(forId));
-            if ($byId.length) return $byId.first();
-          }
-          var $near = $label.closest('.form-group, .row, .da-field-container').find('textarea,input').first();
-          if ($near.length) return $near;
-        }
-        // Last resort: any field name containing site_address
-        $f = $('textarea[name*="site_address"], input[name*="site_address"]');
-        return $f.length ? $f.first() : $();
-      }
-
-      function bindAutocomplete($input) {
-        if (!$input || !$input.length) return;
-        if ($input.data('addrAutocompleteBound')) return;
-        $input.data('addrAutocompleteBound', true);
-
-        var timer = null;
-        $input.on('input', function() {
-          var query = ($input.val() || '').trim();
-          clearTimeout(timer);
-          $input.parent().find('.addr-suggestions').remove();
-          if (query.length < 4) return;
-          timer = setTimeout(function() {
-            $.ajax({
-              url: url_action('address_suggest', { q: query }),
-              dataType: 'json',
-              success: function(results) {
-                $input.parent().find('.addr-suggestions').remove();
-                if (!results || results.length === 0) return;
-                if (!$input.parent().hasClass('addr-autocomplete')) {
-                  $input.wrap('<div class="addr-autocomplete"></div>');
-                }
-                var $drop = $('<div class="addr-suggestions"></div>');
-                results.forEach(function(label) {
-                  $drop.append($('<div></div>').text(label).on('mousedown', function(e) {
-                    e.preventDefault();
-                    $input.val(label);
-                    $drop.remove();
-                    $input.trigger('change');
-                  }));
-                });
-                $drop.append('<div class="addr-powered">Powered by OpenStreetMap</div>');
-                $input.parent().append($drop);
-                $drop.show();
-              }
-            });
-          }, 350);
-        });
-
-        $input.on('blur', function() {
-          setTimeout(function() { $input.parent().find('.addr-suggestions').remove(); }, 200);
-        });
-      }
-
-      // Bind now and also after a short delay (DOM timing in Docassemble can be tricky)
-      $(document).ready(function() {
-        var $input = findSiteAddressField();
-        bindAutocomplete($input);
-        setTimeout(function() { bindAutocomplete(findSiteAddressField()); }, 300);
-      });
-    })();
-  </script>
 section: job_info
 ---
 question: |
@@ -1174,7 +1048,7 @@ fields:
   - Number of drawings: report.num_drawings
     datatype: integer
     min: 0
-    max: 10
+    max: ${ MAX_DRAWINGS }
     default: 1
 section: media
 ---
@@ -1512,24 +1386,10 @@ code: |
   # Archive the PDF to server filesystem for persistent access (map pins, etc.)
   # This generates the full PDF and saves a copy — separate from the download event.
   try:
-    from docassemble.base.util import pdf_concatenate, DAStaticFile
-    # Ensure attachment variables exist before referencing .pdf (prevents NameError)
+    from docassemble.base.util import pdf_concatenate
     cover_pdf
     report_pdf
-    _archive_parts = [cover_pdf.pdf, report_pdf.pdf]
-    for _aidx in range(len(report.get_report_cont_pages())):
-      _archive_parts.append(report.cont_pages[_aidx].filled_pdf.pdf)
-    for _aidx, _apage in enumerate(report.photo_pages):
-      if _apage.has_content():
-        _archive_parts.append(_apage.filled_pdf.pdf)
-    for _aidx in range(report.num_drawings if defined('report.num_drawings') else 0):
-      _adrawing = report.drawings[_aidx]
-      if hasattr(_adrawing, 'file') and _adrawing.file:
-        if _adrawing.is_large_format():
-          _archive_parts.append(_adrawing.filled_pdf_wide.pdf)
-        else:
-          _archive_parts.append(_adrawing.filled_pdf_letter.pdf)
-    _archive_parts.append(DAStaticFile(filename='data/static/legend_page.pdf'))
+    _archive_parts = get_report_pdf_parts(cover_pdf, report_pdf, report)
     _archived_pdf = pdf_concatenate(*_archive_parts, filename=report.get_export_filename())
     ReportArchiver.archive_pdf(_archived_pdf, report.quadra_job_number)
   except Exception as _archive_err:
@@ -1650,32 +1510,9 @@ attachment:
 # ============================================
 event: download_report
 code: |
-  from docassemble.base.util import pdf_concatenate, DAStaticFile
-  
-  parts = [cover_pdf.pdf, report_pdf.pdf]
+  from docassemble.base.util import pdf_concatenate
 
-  # Report continuation pages (overflow from combined report, then billing details)
-  for idx in range(len(report.get_report_cont_pages())):
-    parts.append(report.cont_pages[idx].filled_pdf.pdf)
-  
-  # Photo pages — only include pages that have at least one photo
-  for idx, page in enumerate(report.photo_pages):
-    if page.has_content():
-      parts.append(page.filled_pdf.pdf)
-  
-  # Drawing pages — select letter or wide template based on format
-  # (bounded by user-selected count, so reduced counts do not export stale pages)
-  for idx in range(report.num_drawings if defined('report.num_drawings') else 0):
-    drawing = report.drawings[idx]
-    if hasattr(drawing, 'file') and drawing.file:
-      if drawing.is_large_format():
-        parts.append(drawing.filled_pdf_wide.pdf)
-      else:
-        parts.append(drawing.filled_pdf_letter.pdf)
-  
-  # Legend page (static — no form fields)
-  parts.append(DAStaticFile(filename='data/static/legend_page.pdf'))
-  
+  parts = get_report_pdf_parts(cover_pdf, report_pdf, report)
   export_name = report.get_export_filename()
   final_report = pdf_concatenate(*parts, filename=export_name)
   # Revert to known-safe response wiring to avoid file-not-found regressions.
@@ -1732,28 +1569,15 @@ code: |
   # Upload the archived PDF to the user's linked Dropbox.
   # Filename uses the standard export format: "YYYY-MM-DD Client Address QJN.pdf"
   _db_filename = report.get_export_filename()
-  _db_folder = '/Quadra Reports'
+  _db_folder = DROPBOX_REPORTS_FOLDER
   _db_path = _db_folder + '/' + _db_filename
   _archived_path = ReportArchiver.get_archived_path(report.quadra_job_number)
   if _archived_path:
     _db_ok = DropboxService.upload_file(_archived_path, _db_path)
   else:
-    # Fallback: generate PDF on-the-fly
-    from docassemble.base.util import pdf_concatenate, DAStaticFile
-    _db_parts = [cover_pdf.pdf, report_pdf.pdf]
-    for _di in range(len(report.get_report_cont_pages())):
-      _db_parts.append(report.cont_pages[_di].filled_pdf.pdf)
-    for _di2, _dp in enumerate(report.photo_pages):
-      if _dp.has_content():
-        _db_parts.append(_dp.filled_pdf.pdf)
-    for _di3 in range(report.num_drawings if defined('report.num_drawings') else 0):
-      _dd = report.drawings[_di3]
-      if hasattr(_dd, 'file') and _dd.file:
-        if _dd.is_large_format():
-          _db_parts.append(_dd.filled_pdf_wide.pdf)
-        else:
-          _db_parts.append(_dd.filled_pdf_letter.pdf)
-    _db_parts.append(DAStaticFile(filename='data/static/legend_page.pdf'))
+    # Fallback: generate PDF on-the-fly using shared assembly helper
+    from docassemble.base.util import pdf_concatenate
+    _db_parts = get_report_pdf_parts(cover_pdf, report_pdf, report)
     _db_pdf = pdf_concatenate(*_db_parts, filename=_db_filename)
     _db_ok = DropboxService.upload_file(_db_pdf, _db_path)
   dropbox_last_result = 'success' if _db_ok else 'failed'
@@ -1793,8 +1617,7 @@ subquestion: |
   
   Share this job number with the next technician to continue the report.
   
-  You can resume this report at any time by selecting "Resume Existing Job" 
-  and entering the job number.
+  You can return to this report from the Dashboard at any time.
 field: progress_saved
 buttons:
   - Continue Working: continue

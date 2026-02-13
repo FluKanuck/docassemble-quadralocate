@@ -1194,6 +1194,30 @@ This keeps continuation pages consistent with existing indexed attachment patter
 
 ---
 
+### ISS-057 — DocAssemble stuck on "Please wait" / initialize fails with ModuleNotFoundError (local Docker)
+
+| Detail | Value |
+|--------|-------|
+| **Date opened** | 2026-02-13 |
+| **Date resolved** | 2026-02-13 |
+| **Status** | **TRIED** |
+| **Version** | 1.6.8 → 1.6.9 |
+| **Commits** | *(pending)* |
+
+**Symptom:** DocAssemble Docker container stuck on "Please wait while docassemble starts...". Initialize script exits with `ModuleNotFoundError: No module named 'docassemble.base'` and `docassemble.webapp`. Interviews return 404.
+
+**Root cause:** `setup.py` had `install_requires=['docassemble', ...]`. The PyPI package `docassemble` (legacy 1.6.5) conflicts with the official image's split packages (`docassemble.base`, `docassemble.webapp`). Any `pip install docassemble.quadralocate` pulled the legacy package and overwrote/corrupted the venv.
+
+**What we tried:**
+1. Manual `pip install docassemble.webapp` + `pip install --no-deps -e /tmp/docassemble-quadralocate` — worked temporarily but lost on container recreate.
+2. Removing DAPACKAGES, using volume mount only — still needed correct install_requires.
+3. Fixed `setup.py` to use `docassemble.webapp` — good but not sufficient alone.
+4. Editable install (`pip install -e`) — breaks `docassemble.webapp` imports due to namespace-package conflict (setuptools/pip issue with editable + normal namespace packages).
+
+**What worked:** (1) Changed `setup.py` `install_requires` from `'docassemble'` to `'docassemble.webapp'`. (2) Use **regular install** (not `-e`) when installing locally: `pip install /tmp/docassemble-quadralocate`. (3) If venv is corrupted, do `docker compose down` then `up -d` for a fresh container, then install.
+
+---
+
 <!-- 
   ┌──────────────────────────────────────────────────────────────────┐
   │  TEMPLATE — Copy this block when adding a new issue.            │

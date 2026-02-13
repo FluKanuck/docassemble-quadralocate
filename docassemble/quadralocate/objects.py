@@ -1,14 +1,18 @@
 """
 Custom Python objects for Quadra Utility Locate Report
 """
-from docassemble.base.util import DAObject, DAList, DADict, format_time, format_date
-from datetime import datetime, time
+from docassemble.base.util import DAObject, DAList, DADict, format_date, DAStaticFile
+from datetime import datetime
 import os
-import json
+import re
 import logging
 
 log = logging.getLogger(__name__)
 
+
+MIN_SPLIT_RATIO = 0.6
+MAX_DRAWINGS = 10
+DROPBOX_REPORTS_FOLDER = '/Quadra Reports'
 
 __all__ = [
     'UtilityType',
@@ -27,6 +31,13 @@ __all__ = [
     'DropboxService',
     'JobMapService',
     'ReportArchiver',
+    'get_report_pdf_parts',
+    'get_nominatim_contact_email',
+    'get_nominatim_user_agent',
+    'parse_locate_report_subtitle',
+    'MIN_SPLIT_RATIO',
+    'MAX_DRAWINGS',
+    'DROPBOX_REPORTS_FOLDER',
 ]
 
 
@@ -316,13 +327,10 @@ class MultiDayJob(DAObject):
     def format_time_on_site(self):
         """Format TIME ON SITE section for single or multi-day."""
         if not self.is_multi_day or len(self.work_days) <= 1:
-            # Single day format
             if self.work_days:
                 day = self.work_days[0]
                 return day.format_time_range()
             return ""
-        
-        # Multi-day format
         lines = []
         for day in self.work_days:
             date_str = format_date(day.date, format='short') if hasattr(day, 'date') else 'Unknown'
@@ -335,20 +343,16 @@ class MultiDayJob(DAObject):
         lines = []
 
         if not self.is_multi_day or len(self.work_days) <= 1:
-            # Single day - list technicians
             if self.work_days:
                 for tech in self.work_days[0].technicians:
                     if tech.has_any_hours():
                         lines.append(tech.format_tech_line())
-                
-                # Add totals if 2+ technicians
                 if len([t for t in self.work_days[0].technicians if t.has_any_hours()]) >= 2:
                     totals = self.work_days[0].get_all_hours_by_type()
                     totals_line = format_totals_line(totals)
                     if totals_line:
                         lines.append(f"Total: {totals_line}")
         else:
-            # Multi-day - show daily breakdown
             for day_idx, day in enumerate(self.work_days):
                 date_str = format_date(day.date, format='short') if hasattr(day, 'date') else 'Unknown'
                 tech_parts = []
@@ -357,8 +361,6 @@ class MultiDayJob(DAObject):
                         tech_parts.append(tech.format_tech_line())
                 if tech_parts:
                     lines.append(f"Day ({date_str}): " + " | ".join(tech_parts))
-            
-            # Add combined totals
             all_techs = self.get_all_technicians()
             if all_techs:
                 lines.append("")
@@ -680,31 +682,21 @@ class LocateReport(DAObject):
     def format_billing_details(self):
         """Format the complete billing details section."""
         lines = []
-
-        # TIME ON SITE
         time_on_site = self.job.format_time_on_site()
         if time_on_site:
             lines.append(make_line("TIME ON SITE", time_on_site))
-        
-        # TYPE/TIME
         type_time = self.job.format_type_time()
         if type_time:
             type_time_lines = type_time.split("\r")
             lines.append(make_line("TYPE/TIME", type_time_lines[0]))
             for extra_line in type_time_lines[1:]:
                 lines.append(make_continuation_line(extra_line))
-        
-        # SUPPLEMENTAL
         supp_items = self.format_supplemental()
         if supp_items:
             lines.append(make_line("SUPPLEMENTAL", supp_items))
-        
-        # MATERIALS
         mat_items = self.format_materials()
         if mat_items:
             lines.append(make_line("MATERIALS", mat_items))
-        
-        # PROPERTY TYPE
         prop_type = self.format_property_type()
         if prop_type:
             lines.append(make_line("PROPERTY TYPE", prop_type))
@@ -781,30 +773,20 @@ class LocateReport(DAObject):
     def format_combined_report(self):
         """Generate the complete combined report text."""
         sections = []
-
-        # Travel Notes
         travel = getattr(self, 'travel_notes', '')
         if travel:
             sections.append(f"TRAVEL NOTES:\r{travel}")
-        
-        # Site Conditions
         site_cond = getattr(self, 'site_conditions', '')
         if site_cond:
             sections.append(f"SITE CONDITIONS (Obstructions, inaccessible areas, changes to scope etc.):\r{site_cond}")
-        
-        # Utility sections, including forced output for mapped missing docs.
         for utility_key, _, _ in self.utilities.UTILITY_TYPES:
             utility = getattr(self.utilities, utility_key)
             section = self.format_utility_section_with_missing_docs(utility_key, utility)
             if section:
                 sections.append(section)
-        
-        # Hydrovac recommendation
         hydrovac_section = self.hydrovac.format_section()
         if hydrovac_section:
             sections.append(hydrovac_section)
-        
-        # Recommendations (with missing docs and not-in-scope warnings)
         reco_section = self.format_recommendations()
         if reco_section:
             sections.append(reco_section)
@@ -898,7 +880,6 @@ class LocateReport(DAObject):
     
     def get_export_filename(self):
         """Return the export filename: YYYY-MM-DD Client_Company Site_Address QJN."""
-        import re
         date_str = format_date(self.site_visit_date, format='yyyy-MM-dd') if hasattr(self, 'site_visit_date') else ''
         company = getattr(self, 'client_company', '') or ''
         address = getattr(self, 'site_address', '') or ''
@@ -916,7 +897,28 @@ class LocateReport(DAObject):
         return filename + '.pdf'
 
 
-# Helper functions
+def get_report_pdf_parts(cover_pdf_attachment, report_pdf_attachment, report):
+    """Return list of PDF file objects in report order: cover, report, cont pages, photo pages, drawings, legend.
+
+    Used by archive, download_report, and save_to_dropbox to avoid duplicating assembly logic.
+    """
+    parts = [cover_pdf_attachment.pdf, report_pdf_attachment.pdf]
+    for i in range(len(report.get_report_cont_pages())):
+        parts.append(report.cont_pages[i].filled_pdf.pdf)
+    for page in report.photo_pages:
+        if page.has_content():
+            parts.append(page.filled_pdf.pdf)
+    num_drawings = getattr(report, 'num_drawings', 0) or 0
+    for i in range(num_drawings):
+        drawing = report.drawings[i]
+        if hasattr(drawing, 'file') and drawing.file:
+            if drawing.is_large_format():
+                parts.append(drawing.filled_pdf_wide.pdf)
+            else:
+                parts.append(drawing.filled_pdf_letter.pdf)
+    parts.append(DAStaticFile(filename='data/static/legend_page.pdf'))
+    return parts
+
 
 def format_number(n):
     """Format number: remove trailing zeros."""
@@ -1013,7 +1015,7 @@ def split_text_at_limit(text, max_chars):
     if len(normalized) <= max_chars:
         return normalized, ''
 
-    min_split = int(max_chars * 0.6)
+    min_split = int(max_chars * MIN_SPLIT_RATIO)
     split_at = -1
     for token in ['\r\r', '\r', '; ', ' ']:
         idx = normalized.rfind(token, min_split, max_chars + 1)
@@ -1162,7 +1164,6 @@ class ReportArchiver:
         Returns:
             The full path of the archived file, or None on failure.
         """
-        import re
         import shutil
         try:
             ReportArchiver.ensure_archive_dir()
@@ -1189,7 +1190,6 @@ class ReportArchiver:
     @staticmethod
     def get_archived_path(job_number):
         """Return the full path of an archived PDF, or None if it doesn't exist."""
-        import re
         safe_name = re.sub(r'[<>:"/\\|?*]', '', str(job_number)).strip()
         if not safe_name:
             return None
@@ -1406,6 +1406,57 @@ class DropboxService:
 
 
 # ============================================================
+# Nominatim (OpenStreetMap) — shared config for address suggest & geocoding
+# ============================================================
+
+NOMINATIM_DEFAULT_EMAIL = 'admin@quadra.com'
+
+# Address suggest (Nominatim autocomplete) — used in locate_report.yml event and JS
+ADDRESS_SUGGEST_MIN_LEN = 3
+ADDRESS_SUGGEST_LIMIT = 6
+ADDRESS_SUGGEST_DEBOUNCE_MS = 350
+TIME_INPUT_STEP_SECONDS = 900
+
+
+def get_nominatim_contact_email():
+    """Contact email for Nominatim usage policy. From config or env, else default."""
+    from docassemble.base.util import get_config
+    return (
+        get_config('nominatim email')
+        or get_config('admin email')
+        or os.environ.get('NOMINATIM_EMAIL')
+        or os.environ.get('LETSENCRYPTEMAIL')
+        or NOMINATIM_DEFAULT_EMAIL
+    )
+
+
+def get_nominatim_user_agent():
+    """User-Agent for Nominatim requests. From config or env, else QuadraLocate/1.0 (email)."""
+    from docassemble.base.util import get_config
+    contact = get_nominatim_contact_email()
+    return (
+        get_config('nominatim user agent')
+        or os.environ.get('NOMINATIM_USER_AGENT')
+        or f"QuadraLocate/1.0 ({contact})"
+    )
+
+
+def parse_locate_report_subtitle(subtitle):
+    """Parse dashboard-style subtitle 'job_number | client_company | site_address | date' into a dict.
+
+    Returns dict with keys: job_number, client, address, date (empty string if missing).
+    """
+    s = (subtitle or '').strip()
+    parts = [p.strip() for p in s.split('|')] if s else []
+    return {
+        'job_number': parts[0] if len(parts) > 0 else '',
+        'client': parts[1] if len(parts) > 1 else '',
+        'address': parts[2] if len(parts) > 2 else '',
+        'date': parts[3] if len(parts) > 3 else '',
+    }
+
+
+# ============================================================
 # Job Map — geocoding + persistent pin storage
 # ============================================================
 
@@ -1434,7 +1485,6 @@ class JobMapService:
         """
         try:
             import requests
-            from docassemble.base.util import get_config
 
             # Clean up the address for better geocoding
             clean_addr = (address_str or '').replace('\n', ', ').replace('\r', ', ').strip()
@@ -1446,20 +1496,8 @@ class JobMapService:
             if 'canada' not in lower and 'bc' not in lower:
                 clean_addr += ', BC, Canada'
 
-            # Nominatim usage policy: include a descriptive UA + contact email
-            contact_email = (
-                get_config('nominatim email')
-                or get_config('admin email')
-                or os.environ.get('NOMINATIM_EMAIL')
-                or os.environ.get('LETSENCRYPTEMAIL')
-                or 'admin@quadra.com'
-            )
-            user_agent = (
-                get_config('nominatim user agent')
-                or os.environ.get('NOMINATIM_USER_AGENT')
-                or f"QuadraLocate/1.0 ({contact_email})"
-            )
-
+            contact_email = get_nominatim_contact_email()
+            user_agent = get_nominatim_user_agent()
             headers = {
                 'User-Agent': user_agent,
                 'Accept-Language': 'en',

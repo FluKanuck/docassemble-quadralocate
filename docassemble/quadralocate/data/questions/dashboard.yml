@@ -85,6 +85,12 @@ mandatory: True
 code: |
   dashboard_screen
 ---
+code: |
+  import docassemble.quadralocate as _pkg
+  quadralocate_version = getattr(_pkg, '__version__', '?.?.?')
+needs:
+  - dashboard_screen
+---
 event: dashboard_screen
 question: |
   &nbsp;
@@ -92,6 +98,7 @@ subquestion: |
   <div class="dash-header">
     <h1><i class="fas fa-hard-hat"></i>&nbsp; Quadra Tech Dashboard</h1>
     <p>Welcome, ${ user_info().first_name or 'Technician' }. Manage your locate reports below.</p>
+    <p class="text-muted" style="font-size:0.8rem; margin-top:0.35rem; margin-bottom:0;">Version ${ quadralocate_version }</p>
   </div>
 
   <div class="dash-actions">
@@ -104,11 +111,6 @@ subquestion: |
   </div>
 
   <%
-    # Fetch all sessions for the Locate Report interview belonging to this user.
-    # Each session's subtitle is formatted as:
-    #   "job_number | client_company | site_address | date"
-    # The 'completed' tag is added when the report reaches final_screen.
-    # interview_list() returns (list, next_id) tuple — use first element
     _raw_result = interview_list(
       filename='docassemble.quadralocate:data/questions/locate_report.yml',
       exclude_invalid=True
@@ -118,20 +120,17 @@ subquestion: |
     completed = []
     in_progress = []
     for s in raw_sessions:
-      subtitle = s.get('subtitle', '') or ''
-      parts = [p.strip() for p in subtitle.split(' | ')]
+      parsed = parse_locate_report_subtitle(s.get('subtitle', '') or '')
       tags = s.get('tags', set()) or set()
       is_completed = 'completed' in tags
-
       info = {
         'session': s.get('session', ''),
         'modtime': s.get('modtime', ''),
-        'job_number': parts[0] if len(parts) > 0 else '',
-        'client': parts[1] if len(parts) > 1 else '',
-        'address': parts[2] if len(parts) > 2 else '',
-        'date': parts[3] if len(parts) > 3 else '',
+        'job_number': parsed['job_number'],
+        'client': parsed['client'],
+        'address': parsed['address'],
+        'date': parsed['date'],
       }
-
       if is_completed:
         completed.append(info)
       else:

@@ -217,32 +217,29 @@ code: |
     _tags = _s.get('tags', set()) or set()
     if 'completed' not in _tags:
       continue
-    _subtitle = _s.get('subtitle', '') or ''
-    _parts = [p.strip() for p in _subtitle.split(' | ')]
-    _jn = _parts[0] if len(_parts) > 0 else ''
-    _cl = _parts[1] if len(_parts) > 1 else ''
-    _ad = _parts[2] if len(_parts) > 2 else ''
-    _dt = _parts[3] if len(_parts) > 3 else ''
-    if not _jn or _jn == 'New Report' or not _ad:
+    _parsed = parse_locate_report_subtitle(_s.get('subtitle', '') or '')
+    job_number = _parsed['job_number']
+    client_company = _parsed['client']
+    site_address = _parsed['address']
+    site_visit_date = _parsed['date']
+    if not job_number or job_number == 'New Report' or not site_address:
       _skipped += 1
       continue
-    # Check if pin already exists
-    if JobMapService.pin_exists(_jn):
+    if JobMapService.pin_exists(job_number):
       _skipped += 1
       continue
-    # Geocode and create pin
-    _lat, _lng = JobMapService.geocode_address(_ad)
+    _lat, _lng = JobMapService.geocode_address(site_address)
     if _lat is not None and _lng is not None:
       from docassemble.base.util import write_record
       from datetime import datetime
       write_record(JobMapService.RECORD_KEY, {
-        'job_number': _jn,
-        'site_address': _ad,
-        'client_company': _cl,
-        'site_visit_date': _dt,
+        'job_number': job_number,
+        'site_address': site_address,
+        'client_company': client_company,
+        'site_visit_date': site_visit_date,
         'lat': _lat,
         'lng': _lng,
-        'pdf_filename': _jn + '.pdf',
+        'pdf_filename': job_number + '.pdf',
         'created_at': datetime.now().isoformat(),
       })
       _synced += 1
@@ -273,8 +270,10 @@ code: |
   _job_num = action_argument('job_number')
   _pdf_path = ReportArchiver.get_archived_path(_job_num) if _job_num else None
   if _pdf_path:
-    import os
-    with open(_pdf_path, 'rb') as _f:
-      response(binaryresponse=_f.read(), content_type='application/pdf', filename=str(_job_num) + '.pdf')
+    try:
+      with open(_pdf_path, 'rb') as _f:
+        response(binaryresponse=_f.read(), content_type='application/pdf', filename=str(_job_num) + '.pdf')
+    except (OSError, IOError) as _e:
+      response('Report file could not be read.', response_code=404)
   else:
     response('Report not found for job number: ' + str(_job_num), response_code=404)
