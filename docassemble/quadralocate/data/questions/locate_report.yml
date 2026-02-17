@@ -5,8 +5,8 @@ metadata:
   description: Site Locate Report for Quadra Utility Locating Ltd.
   authors:
     - name: Quadra Utility Locating Ltd.
-  revision_date: 2026-02-13
-  version: 1.6.8
+  revision_date: 2026-02-17
+  version: 1.7.0
 ---
 modules:
   - docassemble.quadralocate.objects
@@ -242,7 +242,7 @@ question: |
 subquestion: |
   Welcome to the Quadra Utility Locate Report system.
   
-  <small class="text-muted">Version 1.6.10</small>
+  <small class="text-muted">Version 1.7.0</small>
 field: report_action
 buttons:
   - Start New Report: new

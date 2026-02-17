@@ -10,6 +10,9 @@ metadata:
 modules:
   - docassemble.quadralocate.objects
 ---
+include:
+  - docassemble.quadralocate:data/static/quadra-theme.css
+---
 features:
   navigation: False
   progress bar: False
@@ -19,7 +22,6 @@ features:
       .da-page-header { display: none; }
       .da-subquestion { max-width: 1100px; margin: 0 auto; }
       .dash-header {
-        background: linear-gradient(135deg, #1a3a5c 0%, #2d5f8a 100%);
         color: white;
         padding: 2rem 2rem 1.5rem;
         border-radius: 12px;
@@ -49,7 +51,7 @@ features:
         align-items: center;
         margin-bottom: 0.5rem;
       }
-      .dash-card-header h5 { margin: 0; font-weight: 600; color: #1a3a5c; }
+      .dash-card-header h5 { margin: 0; font-weight: 600; }
       .dash-badge {
         display: inline-block;
         padding: 0.2rem 0.6rem;
@@ -95,6 +97,10 @@ event: dashboard_screen
 question: |
   &nbsp;
 subquestion: |
+  <div class="quadra-app-header">
+    <img src="${ url_of('docassemble.quadralocate:data/static/quadra-logo.png') }" alt="Quadra" class="quadra-logo" />
+    <span class="quadra-app-title">Quadra Tech Dashboard</span>
+  </div>
   <div class="dash-header">
     <h1><i class="fas fa-hard-hat"></i>&nbsp; Quadra Tech Dashboard</h1>
     <p>Welcome, ${ user_info().first_name or 'Technician' }. Manage your locate reports below.</p>
@@ -108,6 +114,11 @@ subquestion: |
     <a href="${ interview_url(i='docassemble.quadralocate:data/questions/job_map.yml') }" class="btn btn-outline-secondary">
       <i class="fas fa-map-marked-alt"></i>&nbsp; Job Map
     </a>
+    % if user_has_privilege('access_sessions'):
+    <a href="${ interview_url(i='docassemble.quadralocate:data/questions/all_reports.yml') }" class="btn btn-outline-secondary">
+      <i class="fas fa-list-alt"></i>&nbsp; All Reports
+    </a>
+    % endif
   </div>
 
   <%
@@ -189,6 +200,31 @@ subquestion: |
     <div class="dash-card-actions">
       <a href="${ interview_url(i='docassemble.quadralocate:data/questions/locate_report.yml', session=item['session']) }" class="btn btn-sm btn-primary">
         <i class="fas fa-eye"></i>&nbsp; View &amp; Download
+      </a>
+      <a href="${ interview_url(i='docassemble.quadralocate:data/questions/locate_report.yml', session=item['session']) }" class="btn btn-sm btn-outline-secondary">
+        <i class="fas fa-edit"></i>&nbsp; Edit
+      </a>
+    </div>
+  </div>
+  % endfor
+  % endif
+
+  % if completed:
+  <div class="dash-section-title" style="margin-top: 1.5rem;"><i class="fas fa-edit"></i>&nbsp; Edit a completed report</div>
+  <p class="text-muted" style="margin-bottom: 0.75rem; font-size: 0.9rem;">Choose a report below to open it for editing.</p>
+  % for item in completed:
+  <%
+    _edit_title_parts = []
+    if item.get('date'): _edit_title_parts.append(item['date'])
+    if item.get('job_number'): _edit_title_parts.append(item['job_number'])
+    if item.get('client'): _edit_title_parts.append(item['client'])
+    _edit_label = ' — '.join(_edit_title_parts) if _edit_title_parts else 'Report'
+  %>
+  <div class="dash-card" style="padding: 0.6rem 1rem;">
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+      <span>${ _edit_label }</span>
+      <a href="${ interview_url(i='docassemble.quadralocate:data/questions/locate_report.yml', session=item['session']) }" class="btn btn-sm btn-outline-secondary">
+        <i class="fas fa-edit"></i>&nbsp; Open to edit
       </a>
     </div>
   </div>

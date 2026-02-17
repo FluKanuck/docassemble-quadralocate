@@ -1,0 +1,101 @@
+/* Quadra Utility Locating — Custom Bootstrap 5 theme
+ * Brand: Primary #00b2ff, Secondary #4a5464
+ * Fonts: Oswald (headings), Lato (body)
+ */
+@import url('https://fonts.googleapis.com/css2?family=Lato:wght@400;600;700&family=Oswald:wght@500;600;700&display=swap');
+
+:root {
+  --quadra-primary: #00b2ff;
+  --quadra-secondary: #4a5464;
+  --quadra-heading-font: 'Oswald', sans-serif;
+  --quadra-body-font: 'Lato', sans-serif;
+}
+
+/* Bootstrap 5 variable overrides */
+body, .da-body {
+  font-family: var(--quadra-body-font) !important;
+}
+h1, h2, h3, h4, h5, h6, .h1, .h2, .h3, .h4, .h5, .h6 {
+  font-family: var(--quadra-heading-font) !important;
+}
+.btn-primary, .btn-primary:hover, .btn-primary:focus {
+  background-color: var(--quadra-primary) !important;
+  border-color: var(--quadra-primary) !important;
+}
+.btn-outline-primary {
+  color: var(--quadra-primary) !important;
+  border-color: var(--quadra-primary) !important;
+}
+.btn-outline-primary:hover {
+  background-color: var(--quadra-primary) !important;
+  color: #fff !important;
+}
+.btn-secondary, .btn-outline-secondary:hover {
+  background-color: var(--quadra-secondary) !important;
+  border-color: var(--quadra-secondary) !important;
+}
+a:not(.btn) {
+  color: var(--quadra-primary);
+}
+.text-primary { color: var(--quadra-primary) !important; }
+.bg-primary { background-color: var(--quadra-primary) !important; }
+
+/* Shared app header: logo top-left, dark background */
+.quadra-app-header {
+  background: var(--quadra-secondary);
+  color: #fff;
+  padding: 0.75rem 1.5rem;
+  margin: -1rem -1rem 1rem -1rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+  border-radius: 0 0 12px 12px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+}
+.quadra-app-header .quadra-logo {
+  height: 40px;
+  width: auto;
+  max-width: 180px;
+  object-fit: contain;
+  display: block;
+}
+.quadra-app-header .quadra-app-title {
+  font-family: var(--quadra-heading-font);
+  font-weight: 700;
+  font-size: 1.25rem;
+  margin: 0;
+  color: #fff;
+}
+@media (max-width: 576px) {
+  .quadra-app-header .quadra-logo { height: 32px; max-width: 140px; }
+  .quadra-app-header .quadra-app-title { font-size: 1.1rem; }
+}
+
+/* Dashboard / list page overrides using brand colours */
+.dash-header, .map-header.quadra-header-bg {
+  background: linear-gradient(135deg, var(--quadra-secondary) 0%, #3a4452 100%) !important;
+  color: #fff !important;
+}
+.dash-header h1, .dash-header p { color: inherit; }
+.dash-card-header h5, .map-header h2 {
+  color: var(--quadra-secondary) !important;
+}
+.pin-popup h5 { color: var(--quadra-secondary) !important; }
+.dash-section-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin-bottom: 0.75rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid rgba(0,178,255,0.2);
+  color: var(--quadra-secondary);
+}
+.dash-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #fff;
+  margin-bottom: 0.5rem;
+  transition: box-shadow 0.15s;
+}
+.dash-card:hover { box-shadow: 0 2px 12px rgba(0,0,0,0.08); }
+.da-subquestion { max-width: 1100px; margin: 0 auto; }
