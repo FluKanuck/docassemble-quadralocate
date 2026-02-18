@@ -1218,6 +1218,29 @@ This keeps continuation pages consistent with existing indexed attachment patter
 
 ---
 
+### ISS-058 — UX theme and features (custom theme, dashboard edit, multi-pin map, All reports)
+
+| Detail | Value |
+|--------|-------|
+| **Date opened** | 2026-02-17 |
+| **Date resolved** | 2026-02-17 |
+| **Status** | **TRIED** |
+| **Version** | 1.7.0 |
+| **Commits** | *(this commit)* |
+
+**Symptom:** N/A — planned feature work.
+
+**What we did:**
+1. **Custom Bootstrap 5 theme** — Added `quadra-theme.css` (Oswald/Lato, primary #00b2ff, secondary #4a5464), logo `quadra-logo.png` in static, shared header with logo top-left on dashboard, job map, and All reports.
+2. **Dashboard** — Edit button on each completed report card; dedicated "Edit a completed report" section; "All Reports" link for users with `access_sessions` privilege.
+3. **Job map** — Replaced single-pin OSM iframe with **multi-pin Leaflet** map showing all completed reports (all users); pins from `JobMapService.get_all_pins()`; popups with job info and Download PDF; map container kept swappable for future QGIS.
+4. **All reports view** — New interview `all_reports.yml` using `interview_list(user_id='all')`, gated by `user_has_privilege('access_sessions')`; same card layout and Resume / View & Download / Edit actions.
+5. **Map styling** — Map-specific CSS in `map.css`; theme applied via `include` and `features` in dashboard, job_map, all_reports.
+
+**What worked:** Pending user verification.
+
+---
+
 <!-- 
   ┌──────────────────────────────────────────────────────────────────┐
   │  TEMPLATE — Copy this block when adding a new issue.            │
