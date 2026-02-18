@@ -1456,6 +1456,26 @@ def parse_locate_report_subtitle(subtitle):
     }
 
 
+def get_jump_to_section_variable():
+    """Return variable name for jump_to_section from current request (GET or POST), or None.
+
+    Used by locate_report mandatory block and jump_to_section event. Reading request
+    inside this function avoids putting the Flask request object into the interview
+    session (which causes PicklingError when saving).
+    """
+    try:
+        from flask import request
+        for source in (getattr(request, 'args', None), getattr(request, 'form', None)):
+            if source is not None and getattr(source, 'get', None):
+                if source.get('action') == 'jump_to_section':
+                    val = source.get('variable')
+                    if val:
+                        return val
+    except Exception:
+        pass
+    return None
+
+
 # ============================================================
 # Job Map — geocoding + persistent pin storage
 # ============================================================

@@ -10,78 +10,12 @@ metadata:
 modules:
   - docassemble.quadralocate.objects
 ---
-include:
-  - docassemble.quadralocate:data/static/quadra-theme.css
----
 features:
   navigation: False
   progress bar: False
   question back button: False
-  css: |
-    <style>
-      .da-page-header { display: none; }
-      .da-subquestion { max-width: 1100px; margin: 0 auto; }
-      .dash-header {
-        color: white;
-        padding: 2rem 2rem 1.5rem;
-        border-radius: 12px;
-        margin-bottom: 1.5rem;
-      }
-      .dash-header h1 { margin: 0 0 0.25rem; font-size: 1.75rem; font-weight: 700; }
-      .dash-header p { margin: 0; opacity: 0.85; font-size: 0.95rem; }
-      .dash-actions {
-        display: flex;
-        gap: 0.75rem;
-        flex-wrap: wrap;
-        margin-bottom: 1.5rem;
-      }
-      .dash-actions .btn { border-radius: 8px; font-weight: 600; padding: 0.6rem 1.25rem; }
-      .dash-card {
-        border: 1px solid #e2e8f0;
-        border-radius: 10px;
-        padding: 1rem 1.25rem;
-        margin-bottom: 0.75rem;
-        background: #fff;
-        transition: box-shadow 0.15s;
-      }
-      .dash-card:hover { box-shadow: 0 2px 12px rgba(0,0,0,0.08); }
-      .dash-card-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        margin-bottom: 0.5rem;
-      }
-      .dash-card-header h5 { margin: 0; font-weight: 600; }
-      .dash-badge {
-        display: inline-block;
-        padding: 0.2rem 0.6rem;
-        border-radius: 20px;
-        font-size: 0.75rem;
-        font-weight: 600;
-        text-transform: uppercase;
-        letter-spacing: 0.03em;
-      }
-      .badge-completed { background: #d4edda; color: #155724; }
-      .badge-inprogress { background: #fff3cd; color: #856404; }
-      .dash-card-meta { font-size: 0.875rem; color: #6c757d; margin-bottom: 0.5rem; }
-      .dash-card-meta span { margin-right: 1rem; }
-      .dash-card-actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
-      .dash-card-actions .btn { font-size: 0.85rem; padding: 0.3rem 0.75rem; border-radius: 6px; }
-      .dash-empty {
-        text-align: center;
-        padding: 3rem 1rem;
-        color: #6c757d;
-      }
-      .dash-empty i { font-size: 3rem; margin-bottom: 1rem; display: block; opacity: 0.4; }
-      .dash-section-title {
-        font-size: 1.1rem;
-        font-weight: 600;
-        color: #333;
-        margin-bottom: 0.75rem;
-        padding-bottom: 0.5rem;
-        border-bottom: 2px solid #e2e8f0;
-      }
-    </style>
+  css:
+    - docassemble.quadralocate:data/static/quadra-theme.css
 ---
 mandatory: True
 code: |
@@ -92,18 +26,37 @@ code: |
   quadralocate_version = getattr(_pkg, '__version__', '?.?.?')
 needs:
   - dashboard_screen
+  - dashboard_logo_url
+  - dashboard_user_name
+  - show_all_reports_link
+---
+code: |
+  try:
+    dashboard_logo_url = url_of('docassemble.quadralocate:data/static/quadra-logo.png')
+  except Exception:
+    dashboard_logo_url = ''
+  try:
+    dashboard_user_name = user_info().first_name or 'Technician'
+  except Exception:
+    dashboard_user_name = 'Technician'
+  try:
+    show_all_reports_link = user_has_privilege('access_sessions')
+  except Exception:
+    show_all_reports_link = False
 ---
 event: dashboard_screen
 question: |
   &nbsp;
 subquestion: |
   <div class="quadra-app-header">
-    <img src="${ url_of('docassemble.quadralocate:data/static/quadra-logo.png') }" alt="Quadra" class="quadra-logo" />
+    % if dashboard_logo_url:
+    <img src="${ dashboard_logo_url }" alt="Quadra" class="quadra-logo" />
+    % endif
     <span class="quadra-app-title">Quadra Tech Dashboard</span>
   </div>
   <div class="dash-header">
     <h1><i class="fas fa-hard-hat"></i>&nbsp; Quadra Tech Dashboard</h1>
-    <p>Welcome, ${ user_info().first_name or 'Technician' }. Manage your locate reports below.</p>
+    <p>Welcome, ${ dashboard_user_name }. Manage your locate reports below.</p>
     <p class="text-muted" style="font-size:0.8rem; margin-top:0.35rem; margin-bottom:0;">Version ${ quadralocate_version }</p>
   </div>
 
@@ -114,7 +67,7 @@ subquestion: |
     <a href="${ interview_url(i='docassemble.quadralocate:data/questions/job_map.yml') }" class="btn btn-outline-secondary">
       <i class="fas fa-map-marked-alt"></i>&nbsp; Job Map
     </a>
-    % if user_has_privilege('access_sessions'):
+    % if show_all_reports_link:
     <a href="${ interview_url(i='docassemble.quadralocate:data/questions/all_reports.yml') }" class="btn btn-outline-secondary">
       <i class="fas fa-list-alt"></i>&nbsp; All Reports
     </a>

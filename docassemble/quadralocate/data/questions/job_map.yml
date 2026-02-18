@@ -10,9 +10,6 @@ metadata:
 modules:
   - docassemble.quadralocate.objects
 ---
-include:
-  - docassemble.quadralocate:data/static/quadra-theme.css
----
 features:
   navigation: False
   progress bar: False
@@ -21,6 +18,7 @@ features:
     - https://unpkg.com/leaflet@1.9.4/dist/leaflet.js
   css:
     - https://unpkg.com/leaflet@1.9.4/dist/leaflet.css
+    - docassemble.quadralocate:data/static/quadra-theme.css
     - docassemble.quadralocate:data/static/map.css
 ---
 mandatory: True

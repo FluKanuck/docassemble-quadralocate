@@ -5,8 +5,8 @@ metadata:
   description: Site Locate Report for Quadra Utility Locating Ltd.
   authors:
     - name: Quadra Utility Locating Ltd.
-  revision_date: 2026-02-17
-  version: 1.7.0
+  revision_date: 2026-02-18
+  version: 1.7.3
 ---
 modules:
   - docassemble.quadralocate.objects
@@ -31,6 +31,13 @@ features:
   navigation: True
   progress bar: True
   question back button: True
+  css:
+    - docassemble.quadralocate:data/static/quadra-theme.css
+---
+# Let DocAssemble process URL actions (e.g. jump_to_section from React). No-op when there is no action.
+initial: True
+code: |
+  process_action()
 ---
 initial: True
 code: |
@@ -237,16 +244,7 @@ code: |
     _sub.append(format_date(report.site_visit_date, format='yyyy-MM-dd'))
   set_parts(subtitle=' | '.join(_sub))
 ---
-question: |
-  Quadra Utility Locate Report
-subquestion: |
-  Welcome to the Quadra Utility Locate Report system.
-  
-  <small class="text-muted">Version 1.7.0</small>
-field: report_action
-buttons:
-  - Start New Report: new
-section: introduction
+# Report action screen removed: new sessions go straight to Job Information (dashboard "Start new report" is the entry point).
 ---
 # ============================================
 # JOB INFORMATION
@@ -1076,6 +1074,7 @@ fields:
   - Drawing title/label: report.drawings[i].title
     required: False
     default: "Drawing ${ i + 1 }"
+continue button field: report.drawings[i].drawing_complete
 section: media
 ---
 code: |
@@ -1275,12 +1274,41 @@ continue button field: review_complete
 continue button label: Generate Report
 section: review
 ---
+# Jump to section: used by the React app (GET/POST with action=jump_to_section&variable=<name>). process_action() runs this event.
+event: jump_to_section
+code: |
+  _var = None
+  try:
+    _var = action_argument('variable')
+  except Exception:
+    pass
+  if not _var:
+    _var = get_jump_to_section_variable()
+  if not _var and defined('url_args') and getattr(url_args, 'get', None):
+    _var = url_args.get('variable')
+  if _var:
+    force_ask(_var)
+---
 # ============================================
 # GENERATE REPORT
 # ============================================
 mandatory: True
 code: |
-  report_action
+  # Jump to section: React app sends GET with action=jump_to_section&variable=<name> in URL.
+  # Skip entirely on new_session=1 so we never touch request during session creation (avoids 501).
+  _jvar = None
+  if defined('url_args') and getattr(url_args, 'get', None) and not url_args.get('new_session'):
+    try:
+      _jvar = get_jump_to_section_variable()
+      if not _jvar and url_args.get('action') == 'jump_to_section':
+        _jvar = url_args.get('variable')
+    except Exception:
+      pass
+  if _jvar:
+    force_ask(_jvar)
+  # Start new report by default (no separate "report action" screen)
+  if not defined('report_action'):
+    report_action = 'new'
   report.client_company
   report.quadra_job_number
   report.site_address
