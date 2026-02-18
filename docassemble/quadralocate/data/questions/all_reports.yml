@@ -1,0 +1,147 @@
+---
+metadata:
+  title: Quadra — All Reports
+  short title: All Reports
+  description: View all locate reports (admins/supervisors)
+  authors:
+    - name: Quadra Utility Locating Ltd.
+  temporary session: True
+---
+modules:
+  - docassemble.quadralocate.objects
+---
+features:
+  navigation: False
+  progress bar: False
+  question back button: False
+  css:
+    - docassemble.quadralocate:data/static/quadra-theme.css
+---
+mandatory: True
+code: |
+  if not user_has_privilege('access_sessions'):
+    force_ask('all_reports_denied')
+  force_ask('all_reports_screen')
+---
+event: all_reports_denied
+question: |
+  Access denied
+subquestion: |
+  You do not have permission to view all reports. Return to your dashboard.
+buttons:
+  - Back to Dashboard: exit_redirect
+---
+event: exit_redirect
+code: |
+  redirect(interview_url(i='docassemble.quadralocate:data/questions/dashboard.yml'))
+---
+event: all_reports_screen
+question: |
+  &nbsp;
+subquestion: |
+  <div class="quadra-app-header">
+    <img src="${ url_of('docassemble.quadralocate:data/static/quadra-logo.png') }" alt="Quadra" class="quadra-logo" />
+    <span class="quadra-app-title">All Reports</span>
+  </div>
+  <div class="dash-header">
+    <h1><i class="fas fa-list-alt"></i>&nbsp; All Reports</h1>
+    <p>All locate report sessions (all users).</p>
+  </div>
+
+  <div class="dash-actions">
+    <a href="${ interview_url(i='docassemble.quadralocate:data/questions/dashboard.yml') }" class="btn btn-outline-secondary">
+      <i class="fas fa-arrow-left"></i>&nbsp; My Dashboard
+    </a>
+    <a href="${ interview_url(i='docassemble.quadralocate:data/questions/job_map.yml') }" class="btn btn-outline-secondary">
+      <i class="fas fa-map-marked-alt"></i>&nbsp; Job Map
+    </a>
+  </div>
+
+  <%
+    _raw_result = interview_list(
+      filename='docassemble.quadralocate:data/questions/locate_report.yml',
+      user_id='all',
+      exclude_invalid=True
+    )
+    raw_sessions = _raw_result[0] if isinstance(_raw_result, (list, tuple)) and len(_raw_result) > 0 else (_raw_result if isinstance(_raw_result, list) else [])
+    completed = []
+    in_progress = []
+    for s in raw_sessions:
+      parsed = parse_locate_report_subtitle(s.get('subtitle', '') or '')
+      tags = s.get('tags', set()) or set()
+      is_completed = 'completed' in tags
+      info = {
+        'session': s.get('session', ''),
+        'modtime': s.get('modtime', ''),
+        'job_number': parsed['job_number'],
+        'client': parsed['client'],
+        'address': parsed['address'],
+        'date': parsed['date'],
+      }
+      if is_completed:
+        completed.append(info)
+      else:
+        in_progress.append(info)
+  %>
+
+  % if in_progress:
+  <div class="dash-section-title"><i class="fas fa-spinner"></i>&nbsp; In Progress</div>
+  % for item in in_progress:
+  <div class="dash-card">
+    <div class="dash-card-header">
+      <h5>${ item['job_number'] or 'New Report' }</h5>
+      <span class="dash-badge badge-inprogress">In Progress</span>
+    </div>
+    <div class="dash-card-meta">
+      % if item['client']:
+      <span><i class="fas fa-building"></i>&nbsp; ${ item['client'] }</span>
+      % endif
+      % if item['address']:
+      <span><i class="fas fa-map-marker-alt"></i>&nbsp; ${ item['address'][:60] }</span>
+      % endif
+      % if item['date']:
+      <span><i class="fas fa-calendar"></i>&nbsp; ${ item['date'] }</span>
+      % endif
+    </div>
+    <div class="dash-card-actions">
+      <a href="${ interview_url(i='docassemble.quadralocate:data/questions/locate_report.yml', session=item['session']) }" class="btn btn-sm btn-primary">
+        <i class="fas fa-play"></i>&nbsp; Resume
+      </a>
+    </div>
+  </div>
+  % endfor
+  % endif
+
+  % if completed:
+  <div class="dash-section-title" style="margin-top: 1.5rem;"><i class="fas fa-check-circle"></i>&nbsp; Completed Reports</div>
+  % for item in completed:
+  <%
+    _title_parts = []
+    if item.get('date'): _title_parts.append(item['date'])
+    if item.get('client'): _title_parts.append(item['client'])
+    if item.get('address'): _title_parts.append(item['address'][:50])
+    if item.get('job_number'): _title_parts.append(item['job_number'])
+    _card_title = ' — '.join(_title_parts) if _title_parts else 'Report'
+  %>
+  <div class="dash-card">
+    <div class="dash-card-header">
+      <h5>${ _card_title }</h5>
+      <span class="dash-badge badge-completed">Completed</span>
+    </div>
+    <div class="dash-card-actions">
+      <a href="${ interview_url(i='docassemble.quadralocate:data/questions/locate_report.yml', session=item['session']) }" class="btn btn-sm btn-primary">
+        <i class="fas fa-eye"></i>&nbsp; View &amp; Download
+      </a>
+      <a href="${ interview_url(i='docassemble.quadralocate:data/questions/locate_report.yml', session=item['session']) }" class="btn btn-sm btn-outline-secondary">
+        <i class="fas fa-edit"></i>&nbsp; Edit
+      </a>
+    </div>
+  </div>
+  % endfor
+  % endif
+
+  % if not in_progress and not completed:
+  <div class="text-muted">No reports found.</div>
+  % endif
+buttons:
+  - Refresh: refresh
