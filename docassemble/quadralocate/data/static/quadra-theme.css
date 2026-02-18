@@ -73,13 +73,84 @@ a:not(.btn) {
 }
 
 /* Dashboard / list page overrides using brand colours */
-.dash-header, .map-header.quadra-header-bg {
+.dash-header {
   background: linear-gradient(135deg, var(--quadra-secondary) 0%, #3a4452 100%) !important;
   color: #fff !important;
+  padding: 2rem 2rem 1.5rem;
+  border-radius: 12px;
+  margin-bottom: 1.5rem;
 }
+.dash-header h1 { margin: 0 0 0.25rem; font-size: 1.75rem; font-weight: 700; }
 .dash-header h1, .dash-header p { color: inherit; }
+.dash-header p { margin: 0; opacity: 0.85; font-size: 0.95rem; }
+.dash-actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.5rem;
+}
+.dash-actions .btn {
+  border-radius: 8px;
+  font-weight: 600;
+  padding: 0.6rem 1.25rem;
+}
+.dash-card {
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  padding: 1rem 1.25rem;
+  background: #fff;
+  margin-bottom: 0.75rem;
+  transition: box-shadow 0.15s;
+}
+.dash-card:hover { box-shadow: 0 2px 12px rgba(0,0,0,0.08); }
+.dash-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
 .dash-card-header h5, .map-header h2 {
+  margin: 0;
+  font-weight: 600;
   color: var(--quadra-secondary) !important;
+}
+.dash-card-meta {
+  font-size: 0.875rem;
+  color: #6c757d;
+  margin-bottom: 0.5rem;
+}
+.dash-card-meta span { margin-right: 1rem; }
+.dash-card-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+.dash-card-actions .btn {
+  font-size: 0.85rem;
+  padding: 0.3rem 0.75rem;
+  border-radius: 6px;
+}
+.dash-badge {
+  display: inline-block;
+  padding: 0.2rem 0.6rem;
+  border-radius: 20px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.badge-completed { background: #d4edda; color: #155724; }
+.badge-inprogress { background: #fff3cd; color: #856404; }
+.dash-empty {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: #6c757d;
+}
+.dash-empty i {
+  font-size: 3rem;
+  margin-bottom: 1rem;
+  display: block;
+  opacity: 0.4;
 }
 .pin-popup h5 { color: var(--quadra-secondary) !important; }
 .dash-section-title {
@@ -90,12 +161,4 @@ a:not(.btn) {
   border-bottom: 2px solid rgba(0,178,255,0.2);
   color: var(--quadra-secondary);
 }
-.dash-card {
-  border: 1px solid #e2e8f0;
-  border-radius: 10px;
-  background: #fff;
-  margin-bottom: 0.5rem;
-  transition: box-shadow 0.15s;
-}
-.dash-card:hover { box-shadow: 0 2px 12px rgba(0,0,0,0.08); }
 .da-subquestion { max-width: 1100px; margin: 0 auto; }

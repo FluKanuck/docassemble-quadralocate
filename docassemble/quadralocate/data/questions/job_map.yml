@@ -55,7 +55,7 @@ subquestion: |
     <div><i class="fas fa-map-pin"></i>&nbsp; <span>${ pin_count }</span> job${ 's' if pin_count != 1 else '' } on map</div>
   </div>
 
-  <div id="job-map" class="quadra-map-container" data-pins="${ pins_json | h }" data-pdf-base="${ (serve_pdf_base or '') | h }" style="width:100%; height:70vh; min-height:420px; border:1px solid #e2e8f0; border-radius:10px; background:#f8f9fa;"></div>
+  <div id="job-map" class="quadra-map-container" data-pins="${ pins_json | h }" data-pdf-base="${ (serve_pdf_base or '') | h }"></div>
   % if not pins_for_js:
   <div class="alert alert-warning" role="alert" style="max-width: 900px; margin-top: 0.5rem;">
     No map pins yet. Create pins by completing a report, or click <strong>Sync Existing Reports</strong>.

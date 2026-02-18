@@ -195,10 +195,10 @@ subquestion: |
   <div style="margin-top: 2rem; padding-top: 1rem; border-top: 2px solid #e2e8f0;">
     <div class="dash-section-title"><i class="fab fa-dropbox"></i>&nbsp; Dropbox Connection</div>
     % if DropboxService.is_linked():
-    <div class="dash-card" style="border-left: 4px solid #28a745;">
+    <div class="dash-card border-start border-success border-4">
       <div style="display: flex; justify-content: space-between; align-items: center;">
         <div>
-          <i class="fas fa-check-circle" style="color:#28a745;"></i>&nbsp;
+          <i class="fas fa-check-circle text-success"></i>&nbsp;
           <strong>Dropbox connected.</strong> Reports can be saved directly to your Dropbox.
         </div>
         <a href="${ url_action('unlink_dropbox') }" class="btn btn-sm btn-outline-danger">
@@ -207,10 +207,10 @@ subquestion: |
       </div>
     </div>
     % else:
-    <div class="dash-card" style="border-left: 4px solid #ffc107;">
+    <div class="dash-card border-start border-warning border-4">
       <div style="display: flex; justify-content: space-between; align-items: center;">
         <div>
-          <i class="fas fa-exclamation-circle" style="color:#ffc107;"></i>&nbsp;
+          <i class="fas fa-exclamation-circle text-warning"></i>&nbsp;
           <strong>Dropbox not connected.</strong> Link your account to save reports to Dropbox.
         </div>
         <a href="${ url_action('link_dropbox') }" class="btn btn-sm btn-primary">
